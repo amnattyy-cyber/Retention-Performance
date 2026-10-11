@@ -27,6 +27,7 @@ footer{background:var(--navy);color:#fff;padding:28px 0}footer .shell{display:fl
 .partition[hidden]{display:none!important}
 .focus-table .empty-state{text-align:center;padding:28px;color:var(--muted);font-size:.8rem;background:#fff}
 .branch-card{margin-bottom:12px}.branch-scroll{max-height:720px}
+.hall-section-title{margin-top:8px}.hall-service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:20px}.hall-service-card{border-radius:var(--radius);padding:22px;color:#fff;box-shadow:var(--shadow)}.hall-service-card.tmh{background:linear-gradient(135deg,#df6810,#f6a13b)}.hall-service-card.tol{background:linear-gradient(135deg,#126bb4,#40a5e8)}.hall-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.hall-card-head small{font-size:.63rem;opacity:.78}.hall-card-head h3{margin:3px 0 0;font-size:1.18rem}.hall-card-head>strong{font-size:.82rem;background:rgba(255,255,255,.18);padding:6px 9px;border-radius:999px}.hall-card-period{display:flex;align-items:center;gap:9px;margin:16px 0 14px;font-size:.75rem}.hall-card-period b{opacity:.7}.hall-card-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.hall-card-metrics div{border-left:1px solid rgba(255,255,255,.25);padding-left:9px}.hall-card-metrics div:first-child{border-left:0;padding-left:0}.hall-card-metrics small,.hall-card-metrics strong{display:block}.hall-card-metrics small{font-size:.6rem;opacity:.75}.hall-card-metrics strong{margin-top:3px;font-size:.93rem}.branch-toolbar-actions{display:flex;align-items:flex-end;justify-content:flex-end;gap:12px}.branch-toolbar-actions label{font-size:.66rem;color:var(--muted);font-weight:700}.branch-toolbar-actions select{display:block;margin-top:4px;border:1px solid var(--line);border-radius:9px;background:#fbfcff;color:var(--ink);padding:7px 28px 7px 9px;font:inherit;font-size:.7rem}
 .branch-table .group-meta{background:#e7edf6;min-width:105px}
 .branch-table .branch-cell{position:sticky;left:0;z-index:2;text-align:left;min-width:260px;max-width:260px;background:#fff;box-shadow:4px 0 8px rgba(30,42,71,.05);padding:8px 11px}
 .branch-table tbody tr:nth-child(even) .branch-cell{background:#f8f9fc}.branch-table tbody tr:hover .branch-cell{background:#eef9f8}
@@ -35,6 +36,7 @@ footer{background:var(--navy);color:#fff;padding:28px 0}footer .shell{display:fl
 .branch-table thead .group-region{min-width:260px;max-width:260px}.branch-table .group-tier{min-width:205px}
 @media (max-width:1100px){.control-bar{grid-template-columns:1fr 1fr 1fr}.control-heading{grid-column:1/-1}}
 @media (max-width:720px){.control-bar{grid-template-columns:1fr 1fr}.partition-tabs{display:flex}.partition-tab{flex:1}.branch-table .branch-cell,.branch-table thead .group-region{min-width:210px;max-width:210px}.branch-table .branch-cell strong{max-width:188px}}
+@media (max-width:850px){.hall-service-grid{grid-template-columns:1fr}.hall-card-metrics{grid-template-columns:repeat(3,1fr)}.branch-toolbar-actions{align-items:flex-start;flex-direction:column}}
 @media (max-width:430px){.control-bar{grid-template-columns:1fr}}
 
 /* Capture-ready performance tables and product theme */

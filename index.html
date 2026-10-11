@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260826e">
+  <link rel="stylesheet" href="styles.css?v=20261012a">
 </head>
 <body>
   <header class="hero">
@@ -160,13 +160,27 @@
     <div id="branchPartition" class="partition" hidden>
       <section>
         <div class="section-title"><div><span>07</span><h2>Branch performance</h2></div><p>เจาะผลการดำเนินงานรายสาขาตามกลุ่มและ Area ที่เลือก</p></div>
+
+        <div class="section-title hall-section-title"><div><span>07A</span><h2>Shop Type: Hall</h2></div><p>สรุปผล Hall แยก TMH และ TOL ตามพื้นที่ที่เลือก</p></div>
+        <div class="hall-service-grid" id="hallServiceCards"></div>
+
         <article class="focus-table-card branch-card">
           <div class="focus-table-toolbar">
             <div>
               <h3>Performance by Branch</h3>
               <p id="branchDataNotice">แสดงชื่อสาขาเท่านั้น • ซ่อนรหัส TDS/WW • เรียงตามพื้นที่และระดับ Over Budget</p>
             </div>
-            <div class="focus-table-badges"><span id="branchTableScope">ALL</span><span id="branchTableCount">— Branches</span></div>
+            <div class="branch-toolbar-actions">
+              <label>Shop Type
+                <select id="shopTypeFilter">
+                  <option value="ALL">ทุกประเภท</option>
+                  <option value="Matching">Matching</option>
+                  <option value="Non Matching">Non Matching</option>
+                  <option value="Hall">Hall</option>
+                </select>
+              </label>
+              <div class="focus-table-badges"><span id="branchTableScope">ALL</span><span id="branchTableCount">— Branches</span></div>
+            </div>
           </div>
           <div class="table-scroll branch-scroll" role="region" aria-label="ตาราง Performance รายสาขา" tabindex="0">
             <table class="focus-table performance-table branch-table">
@@ -305,7 +319,7 @@
   </footer>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20260907a"></script>
+  <script src="app.js?v=20261012a"></script>
 </body>
 </html>
 
