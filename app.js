@@ -5,6 +5,13 @@ const DOWN_HEADERS = ["Report Date","Region","No Shop","Budget Downsell","Downse
 const BRANCH_HEADERS = ["Report Date","Service","Area Group","Region","Shop Name","Shop Type","Request Jul","Request Aug","Request MoM","Request %MoM","Save Jul","Save Aug","Save MoM","Save %MoM","Churn Jul","Churn Aug","Churn MoM","Churn %MoM","Save Rate Jul","Save Rate Aug","Save Rate MoM","Budget Churn","MTD Budget Churn","Over Budget","Tier","Cutoff Day","Days in Month"];
 const DOWNSELL_DETAIL_HEADERS = ["Report Date","Level","Area Group","Region","Shop Name","Shop Type","No Shop","Budget Downsell","Downsell Retention","Downsell Aftersale","Total Downsell","RR Downsell","MTD / Budget","RR / Budget","Over Budget Records","Status","Last Month","Cutoff Day","Days in Month"];
 const SOLUTION_HEADERS = ["Report Date","Product","Area Group","Region","Shop Name","Solution Name","Request Sub","Rev Request","Rev Save","Churn Value","Cutoff Day","Days in Month"];
+const GVIZ_RANGES = {
+  Performance_Daily: "A1:N1000",
+  Downsell_Area_Daily: "A1:N1012",
+  Branch_Performance_Daily: "A1:AA1000",
+  Downsell_Performance_Daily: "A1:S1000",
+  Solution_Performance_Daily: "A1:L5000"
+};
 const AREA_GROUPS = {
   "BMA 5 Area": ["BMA I - North West","BMA II - South West","BMA III - North East","BMA IV - South East","BMA V - Central"],
   UPC1: ["UPC - Central Northeast","UPC - Lower North","UPC - Lower Northeast","UPC - Upper North","UPC - Upper Northeast"],
@@ -82,7 +89,8 @@ function loadGviz(sheet){
       resolve(response.table.rows.map(row=>row.c.map(cell=>cell?.v??"")));
     };
     script.onerror=()=>{cleanup();reject(new Error("network"));};
-    script.src=`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${callback}&sheet=${encodeURIComponent(sheet)}&headers=1`;
+    const range=GVIZ_RANGES[sheet]||"A1:Z1000";
+    script.src=`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${callback}&sheet=${encodeURIComponent(sheet)}&range=${encodeURIComponent(range)}&headers=1`;
     document.head.appendChild(script);
   });
 }
