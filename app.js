@@ -54,6 +54,10 @@ const fmtDate = value => {
 const deltaClass = (value,inverse=false) => Math.abs(value)<.0005?"neutral":((inverse?value<0:value>0)?"good":"bad");
 const rowObjects = (rows,headers) => rows.map(row=>Object.fromEntries(headers.map((header,index)=>[header,index===0?dateKey(row[index]):row[index]])));
 const delta = (now,before) => before?(now-before)/before:0;
+const normalizeShopType = value => {
+  const text=String(value||"").trim().toLowerCase().replaceAll("_"," ");
+  return ({matching:"Matching","non matching":"Non Matching",hall:"Hall"})[text]||String(value||"").trim();
+};
 
 function inScope(region,group,selectedRegion){
   if(!region||region==="ALL") return false;
@@ -249,8 +253,8 @@ function summarizeBranchRows(rows,service){
   return item;
 }
 
-function branchFocusData(service,group,region){
-  let pool=store.branches.filter(row=>(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region));
+function branchFocusData(service,group,region,shopType="ALL"){
+  let pool=store.branches.filter(row=>(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)&&(shopType==="ALL"||normalizeShopType(row["Shop Type"])===shopType));
   const latest=[...new Set(pool.map(row=>row["Report Date"]))].sort().at(-1);
   pool=pool.filter(row=>row["Report Date"]===latest&&row["Shop Name"]);
   const grouped=new Map();
@@ -263,10 +267,24 @@ function branchRowHtml(row){
   return `<tr><th class="branch-cell" scope="row"><strong>${escapeHtml(row.shop)}</strong><small>${escapeHtml(row.shopType)}</small></th><td class="area-cell">${escapeHtml(row.region)}</td><td><span class="service-pill ${serviceClass(row.service)}">${escapeHtml(row.service.replace(" + ","+"))}</span></td><td>${fmtFull(row.requestJul)}</td><td>${fmtFull(row.requestAug)}</td><td class="cell-tone ${tone(row.requestDiff,true)}">${fmtSignedFull(row.requestDiff)}</td><td class="cell-tone ${tone(row.requestMom,true)}">${fmtDelta(row.requestMom)}</td><td>${fmtFull(row.saveJul)}</td><td>${fmtFull(row.saveAug)}</td><td class="cell-tone ${tone(row.saveDiff)}">${fmtSignedFull(row.saveDiff)}</td><td class="cell-tone ${tone(row.saveMom)}">${fmtDelta(row.saveMom)}</td><td>${fmtFull(row.churnJul)}</td><td>${fmtFull(row.churnAug)}</td><td class="cell-tone ${tone(row.churnDiff,true)}">${fmtSignedFull(row.churnDiff)}</td><td class="cell-tone ${tone(row.churnMom,true)}">${fmtDelta(row.churnMom)}</td><td>${fmtPct(row.saveRateJul)}</td><td>${fmtPct(row.saveRateAug)}</td><td class="cell-tone ${tone(row.saveRateDiff)}">${fmtPP(row.saveRateDiff)}</td><td>${fmtFull(row.budget)}</td><td>${fmtFull(row.mtdBudget)}</td><td class="over-budget ${row.overBudget>1?"bad":"good"}">${fmtPct(row.overBudget)}</td><td><span class="tier-pill ${row.tier.code.toLowerCase()}" title="${escapeHtml(row.tier.text)}">${row.tier.code}</span></td></tr>`;
 }
 
+function hallCard(service,group,region){
+  let pool=store.branches.filter(row=>row.Service===service&&normalizeShopType(row["Shop Type"])==="Hall"&&inScope(row.Region,group,region));
+  const latest=[...new Set(pool.map(row=>row["Report Date"]))].sort().at(-1);
+  pool=pool.filter(row=>row["Report Date"]===latest&&row["Shop Name"]);
+  const requestBefore=sum(pool,"Request Jul"),requestNow=sum(pool,"Request Aug"),saveNow=sum(pool,"Save Aug"),churnNow=sum(pool,"Churn Aug"),budget=sum(pool,"Budget Churn");
+  const cutoff=n(pool[0]?.["Cutoff Day"]),days=n(pool[0]?.["Days in Month"]),rr=cutoff?churnNow/cutoff*days:0,saveRate=requestNow?saveNow/requestNow:0,rrCap=budget?rr/budget:0;
+  const branches=new Set(pool.map(row=>row["Shop Name"])).size;
+  return `<article class="hall-service-card ${service.toLowerCase()}"><div class="hall-card-head"><div><small>SHOP TYPE</small><h3>Hall • ${service}</h3></div><strong>${branches} สาขา</strong></div><div class="hall-card-period"><span>${comparisonMonths.before} ${fmtMoney(requestBefore)}</span><b>→</b><span>${comparisonMonths.now} ${fmtMoney(requestNow)}</span></div><div class="hall-card-metrics"><div><small>Request</small><strong>${fmtMoney(requestNow)}</strong></div><div><small>Save</small><strong>${fmtMoney(saveNow)}</strong></div><div><small>Churn</small><strong>${fmtMoney(churnNow)}</strong></div><div><small>Save rate</small><strong>${fmtPct(saveRate)}</strong></div><div><small>RR / Cap</small><strong>${fmtPct(rrCap)}</strong></div></div></article>`;
+}
+
+function renderHallCards(group,region){
+  $("hallServiceCards").innerHTML=["TMH","TOL"].map(service=>hallCard(service,group,region)).join("");
+}
+
 function renderBranchTable(service,group,region){
-  const data=branchFocusData(service,group,region);
+  const shopType=$("shopTypeFilter").value,data=branchFocusData(service,group,region,shopType);
   $("branchTableScope").textContent=scopeLabel(group,region);$("branchTableCount").textContent=`${data.rows.length} Branches`;
-  $("branchDataNotice").textContent=store.branchLive?`ข้อมูล ณ ${fmtDate(data.latest)} • แสดงเฉพาะชื่อสาขา • ซ่อนรหัส TDS/WW`:`ไม่สามารถโหลดข้อมูลรายสาขาได้ กรุณาตรวจสิทธิ์ Google Sheet`;
+  $("branchDataNotice").textContent=store.branchLive?`ข้อมูล ณ ${fmtDate(data.latest)} • Shop Type: ${shopType==="ALL"?"ทุกประเภท":shopType} • แสดงเฉพาะชื่อสาขา • ซ่อนรหัส TDS/WW`:`ไม่สามารถโหลดข้อมูลรายสาขาได้ กรุณาตรวจสิทธิ์ Google Sheet`;
   $("branchTableBody").innerHTML=data.rows.length?data.rows.map(branchRowHtml).join(""):'<tr><td colspan="22" class="empty-state">ไม่มีข้อมูลรายสาขาตามตัวกรอง</td></tr>';
 }
 
@@ -395,7 +413,7 @@ function render(){
   const areaPool=store.performance.filter(row=>row["Report Date"]===data.latest&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)),areas=groupAreas(areaPool);
   bars("saveRateBars",areas,"saveRate",{max:1,sort:"asc",kind:"teal",noteKey:item=>item.saveRate<.88?"ต่ำกว่าเป้าหมาย 88%":"ผ่านเป้าหมาย 88%"});
   bars("runRateBars",areas,"rrCap",{max:Math.max(1.6,...areas.map(item=>item.rrCap)),sort:"desc",kind:"warn",noteKey:item=>item.rrCap>1?`เกิน Cap ${fmtPct(item.rrCap-1)}`:"อยู่ใน Cap"});
-  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderSolutions();
+  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderSolutions();
 }
 
 function setPartition(partition){
@@ -406,6 +424,7 @@ function setPartition(partition){
 $("serviceFilter").addEventListener("change",render);
 $("areaGroupFilter").addEventListener("change",()=>{populateRegions();render();});
 $("regionFilter").addEventListener("change",render);
+$("shopTypeFilter").addEventListener("change",render);
 $("solutionBranchFilter").addEventListener("change",renderSolutions);
 $("solutionMetricFilter").addEventListener("change",renderSolutions);
 $("refreshButton").addEventListener("click",loadData);
