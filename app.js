@@ -10,6 +10,7 @@ const GVIZ_RANGES = {
   Downsell_Area_Daily: "A1:N1012",
   Branch_Performance_Daily: "A1:AA1000",
   Downsell_Performance_Daily: "A1:S1000",
+  Downsell_TOL_Daily: "A1:S1000",
   Solution_Performance_Daily: "A1:L5000"
 };
 const AREA_GROUPS = {
@@ -111,8 +112,8 @@ async function loadData(){
   const status=$("dataStatus");
   status.className="status-pill";
   status.innerHTML="<span></span>กำลังโหลดข้อมูล...";
-  const [performance,downsell,branches,downsellDetails,solutions]=await Promise.allSettled([
-    loadGviz("Performance_Daily"),loadGviz("Downsell_Area_Daily"),loadGviz("Branch_Performance_Daily"),loadGviz("Downsell_Performance_Daily"),loadGviz("Solution_Performance_Daily")
+  const [performance,downsell,branches,downsellDetails,tolDownsellDetails,solutions]=await Promise.allSettled([
+    loadGviz("Performance_Daily"),loadGviz("Downsell_Area_Daily"),loadGviz("Branch_Performance_Daily"),loadGviz("Downsell_Performance_Daily"),loadGviz("Downsell_TOL_Daily"),loadGviz("Solution_Performance_Daily")
   ]);
   const coreLive=performance.status==="fulfilled"&&downsell.status==="fulfilled";
   store={
@@ -120,10 +121,12 @@ async function loadData(){
     downsell:coreLive?rowObjects(downsell.value,DOWN_HEADERS):rowObjects(window.RETENTION_FALLBACK.downsell,DOWN_HEADERS),
     branches:branches.status==="fulfilled"?rowObjects(branches.value,BRANCH_HEADERS):[],
     downsellDetails:downsellDetails.status==="fulfilled"?rowObjects(downsellDetails.value,DOWNSELL_DETAIL_HEADERS):[],
+    tolDownsellDetails:tolDownsellDetails.status==="fulfilled"?rowObjects(tolDownsellDetails.value,DOWNSELL_DETAIL_HEADERS):[],
     solutions:solutions.status==="fulfilled"?rowObjects(solutions.value,SOLUTION_HEADERS):solutionFallbackRows(),
     live:coreLive,
     branchLive:branches.status==="fulfilled",
     downsellDetailLive:downsellDetails.status==="fulfilled",
+    tolDownsellDetailLive:tolDownsellDetails.status==="fulfilled",
     solutionLive:solutions.status==="fulfilled"
   };
   if(coreLive&&store.branchLive&&store.downsellDetailLive&&store.solutionLive){status.className="status-pill live";status.innerHTML="<span></span>Live from Google Sheet";}
@@ -320,6 +323,20 @@ function downsellBranchRowHtml(row){
   return `<tr><th class="branch-name" scope="row">${escapeHtml(row["Shop Name"])}</th><td class="area-name">${escapeHtml(row.Region)}</td><td>${escapeHtml(row["Shop Type"])}</td><td>${fmtFull(row["Budget Downsell"])}</td><td>${fmtFull(row["Downsell Retention"])}</td><td>${fmtFull(row["Downsell Aftersale"])}</td><td>${fmtFull(row["Total Downsell"])}</td><td>${fmtFull(row["RR Downsell"])}</td><td>${fmtPct(row["MTD / Budget"])}</td><td class="over-budget ${state==="over"?"bad":"good"}">${fmtPct(row["RR / Budget"])}</td><td><span class="budget-pill ${state}">${escapeHtml(row.Status||(state==="over"?"Over Budget":"In Budget"))}</span></td><td>${row["Last Month"]===""?"—":fmtPct(row["Last Month"])}</td></tr>`;
 }
 
+function renderDownsellTolTables(group,region){
+  const source=store.tolDownsellDetails,scope=scopeLabel(group,region);
+  const latest=source.map(row=>row["Report Date"]).sort().at(-1);
+  const rows=source.filter(row=>row["Report Date"]===latest&&inScope(row.Region,group,region));
+  const areas=rows.filter(row=>String(row.Level).toUpperCase()==="AREA").sort((a,b)=>n(b["RR / Budget"])-n(a["RR / Budget"]));
+  const branches=rows.filter(row=>String(row.Level).toUpperCase()==="BRANCH").sort((a,b)=>String(a.Region).localeCompare(String(b.Region))||n(b["RR / Budget"])-n(a["RR / Budget"])||String(a["Shop Name"]).localeCompare(String(b["Shop Name"])));
+  $("tolDownsellDate").textContent=fmtDate(latest);
+  $("tolDownsellAreaScope").textContent=scope;$("tolDownsellBranchScope").textContent=scope;
+  $("tolDownsellAreaCount").textContent=`${areas.length} ${areas.length===1?"Area":"Areas"}`;
+  $("tolDownsellBranchCount").textContent=`${branches.length} Branches`;
+  $("tolDownsellAreaTableBody").innerHTML=areas.map(downsellAreaRowHtml).join("");
+  $("tolDownsellBranchTableBody").innerHTML=branches.map(downsellBranchRowHtml).join("");
+}
+
 function renderDownsellTables(group,region){
   const areas=downsellDetailData("AREA",group,region),branches=downsellDetailData("BRANCH",group,region),scope=scopeLabel(group,region);
   $("downsellAreaScope").textContent=scope;$("downsellBranchScope").textContent=scope;
@@ -421,12 +438,12 @@ function render(){
   const areaPool=store.performance.filter(row=>row["Report Date"]===data.latest&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)),areas=groupAreas(areaPool);
   bars("saveRateBars",areas,"saveRate",{max:1,sort:"asc",kind:"teal",noteKey:item=>item.saveRate<.88?"ต่ำกว่าเป้าหมาย 88%":"ผ่านเป้าหมาย 88%"});
   bars("runRateBars",areas,"rrCap",{max:Math.max(1.6,...areas.map(item=>item.rrCap)),sort:"desc",kind:"warn",noteKey:item=>item.rrCap>1?`เกิน Cap ${fmtPct(item.rrCap-1)}`:"อยู่ใน Cap"});
-  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderSolutions();
+  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();
 }
 
 function setPartition(partition){
   document.querySelectorAll(".partition-tab").forEach(button=>{const active=button.dataset.partition===partition;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active));});
-  $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("solutionPartition").hidden=partition!=="solution";
+  $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("downsellTolPartition").hidden=partition!=="downsellTol";$("solutionPartition").hidden=partition!=="solution";
 }
 
 $("serviceFilter").addEventListener("change",render);
