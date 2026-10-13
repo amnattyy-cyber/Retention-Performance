@@ -129,7 +129,7 @@ async function loadData(){
     tolDownsellDetailLive:tolDownsellDetails.status==="fulfilled",
     solutionLive:solutions.status==="fulfilled"
   };
-  if(coreLive&&store.branchLive&&store.downsellDetailLive&&store.solutionLive){status.className="status-pill live";status.innerHTML="<span></span>Live from Google Sheet";}
+  if(coreLive&&store.branchLive&&store.downsellDetailLive&&store.tolDownsellDetailLive&&store.solutionLive){status.className="status-pill live";status.innerHTML="<span></span>Live from Google Sheet";}
   else if(coreLive){status.className="status-pill fallback";status.innerHTML="<span></span>Live • บางตารางใช้ข้อมูลสำรอง";}
   else{status.className="status-pill fallback";status.innerHTML="<span></span>Snapshot • รอสิทธิ์ Google Sheet";}
   populateRegions();render();
