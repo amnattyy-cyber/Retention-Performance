@@ -92,3 +92,25 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
 @media (max-width:850px){.solution-controls{grid-template-columns:1fr 1fr}.solution-controls>div{grid-column:1/-1}.solution-leaders,.solution-comparison-grid{grid-template-columns:1fr}}
 @media (max-width:520px){.solution-controls{grid-template-columns:1fr}.solution-controls>div{grid-column:auto}.solution-leader-metrics{gap:6px}.solution-leader-card{padding:20px}.solution-comparison-table{font-size:.62rem}}
 
+
+
+/* Area focus table switches to a blue palette when TOL is selected */
+[data-service="tol"] #areaFocusSection .focus-table thead .group-region{background:#54a9e0;color:#102f4c}
+[data-service="tol"] #areaFocusSection .focus-table .group-request,
+[data-service="tol"] #areaFocusSection .focus-table .sub-request{background:#a8daf5;color:#143c5b}
+[data-service="tol"] #areaFocusSection .focus-table .group-save,
+[data-service="tol"] #areaFocusSection .focus-table .sub-save{background:#75bfe9;color:#123958}
+[data-service="tol"] #areaFocusSection .focus-table .group-churn,
+[data-service="tol"] #areaFocusSection .focus-table .sub-churn{background:#247fb8;color:#fff}
+[data-service="tol"] #areaFocusSection .focus-table .group-rate,
+[data-service="tol"] #areaFocusSection .focus-table .sub-rate{background:#c8e8f9;color:#143c5b}
+[data-service="tol"] #areaFocusSection .focus-table .group-budget{background:#e4f3fc;color:#143c5b}
+[data-service="tol"] #areaFocusSection .focus-table .group-tier{background:#d5ebf8;color:#143c5b}
+[data-service="tol"] #areaFocusSection .focus-table tbody tr:hover td,
+[data-service="tol"] #areaFocusSection .focus-table tbody tr:hover .region-cell{background:#edf8ff}
+[data-service="tol"] #areaFocusSection .focus-table tbody tr.is-focus td,
+[data-service="tol"] #areaFocusSection .focus-table tbody tr.is-focus .region-cell{background:#e0f2ff;box-shadow:inset 0 2px #2c91cb,inset 0 -2px #2c91cb}
+[data-service="tol"] #areaFocusSection .focus-mark{background:#247fb8}
+[data-service="tol"] #areaFocusSection .focus-table-badges span+span{background:#e4f3ff;color:#1268ad}
+[data-service="tol"] #areaFocusSection .focus-table .grand-total td,
+[data-service="tol"] #areaFocusSection .focus-table .grand-total .region-cell{background:#d9edfa!important;border-top-color:#398dbb}
