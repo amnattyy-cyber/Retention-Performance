@@ -60,7 +60,8 @@
     <nav class="partition-tabs" aria-label="เลือกมุมมอง Dashboard">
       <button class="partition-tab is-active" type="button" data-partition="overview" aria-selected="true">ภาพรวม Area</button>
       <button class="partition-tab" type="button" data-partition="branch" aria-selected="false">Branch Performance</button>
-      <button class="partition-tab" type="button" data-partition="downsell" aria-selected="false">Downsell Performance</button>
+      <button class="partition-tab" type="button" data-partition="downsell" aria-selected="false">Downsell TMH</button>
+      <button class="partition-tab" type="button" data-partition="downsellTol" aria-selected="false">Downsell TOL</button>
       <button class="partition-tab" type="button" data-partition="solution" aria-selected="false">Solution Analysis</button>
       <button class="capture-toggle" id="captureModeButton" type="button">⛶ โหมด Capture</button>
     </nav>
@@ -161,7 +162,7 @@
       <section>
         <div class="section-title"><div><span>07</span><h2>Branch performance</h2></div><p>เจาะผลการดำเนินงานรายสาขาตามกลุ่มและ Area ที่เลือก</p></div>
 
-        <div class="section-title hall-section-title"><div><span>07A</span><h2>Shop Type: Hall</h2></div><p>สรุปผล Hall แยก TMH และ TOL ตามพื้นที่ที่เลือก</p></div>
+        <div class="section-title hall-section-title"><div><span>07A</span><h2>Type Shop Hall</h2></div><p>สรุปผล Hall แยก TMH และ TOL ตามพื้นที่ที่เลือก</p></div>
         <div class="hall-service-grid" id="hallServiceCards"></div>
 
         <article class="focus-table-card branch-card">
@@ -266,9 +267,57 @@
       </section>
     </div>
 
+    <div id="downsellTolPartition" class="partition" hidden>
+      <section>
+        <div class="section-title"><div><span>09</span><h2>Downsell TOL</h2></div><p>ข้อมูล ณ <strong id="tolDownsellDate">—</strong> • ติดตาม Budget, MTD และ Run rate ระดับ Area และรายสาขา</p></div>
+
+        <article class="focus-table-card tol-downsell-table-card">
+          <div class="focus-table-toolbar">
+            <div>
+              <h3>TOL Downsell by Area</h3>
+              <p>เรียงตาม RR / Budget จากสูงไปต่ำ • ปรับตามกลุ่มพื้นที่และ Area ที่เลือก</p>
+            </div>
+            <div class="focus-table-badges"><span id="tolDownsellAreaScope">ALL</span><span id="tolDownsellAreaCount">— Areas</span></div>
+          </div>
+          <div class="table-scroll tol-downsell-area-scroll" role="region" aria-label="ตาราง Downsell รายพื้นที่" tabindex="0">
+            <table class="focus-table capture-table tol-downsell-area-table">
+              <caption>TOL Downsell ราย Area</caption>
+              <thead><tr>
+                <th scope="col">Area</th><th scope="col">Shops</th><th scope="col">Budget</th><th scope="col">Retention</th>
+                <th scope="col">Aftersale</th><th scope="col">Total MTD</th><th scope="col">RR</th><th scope="col">MTD/Budget</th>
+                <th scope="col">RR/Budget</th><th scope="col">Over Budget</th><th scope="col">Status</th>
+              </tr></thead>
+              <tbody id="tolDownsellAreaTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="focus-table-card tol-downsell-table-card">
+          <div class="focus-table-toolbar">
+            <div>
+              <h3>TOL Downsell by Branch</h3>
+              <p id="tol-downsellBranchNotice">แสดงชื่อสาขาเท่านั้น • ซ่อนรหัส TDS/WW • Service filter ไม่มีผลกับข้อมูล Downsell</p>
+            </div>
+            <div class="focus-table-badges"><span id="tolDownsellBranchScope">ALL</span><span id="tolDownsellBranchCount">— Branches</span></div>
+          </div>
+          <div class="table-scroll tol-downsell-branch-scroll" role="region" aria-label="ตาราง Downsell รายสาขา" tabindex="0">
+            <table class="focus-table capture-table tol-downsell-branch-table">
+              <caption>TOL Downsell รายสาขา</caption>
+              <thead><tr>
+                <th scope="col">Branch</th><th scope="col">Area</th><th scope="col">Type</th><th scope="col">Budget</th>
+                <th scope="col">Retention</th><th scope="col">Aftersale</th><th scope="col">Total MTD</th><th scope="col">RR</th>
+                <th scope="col">MTD/Budget</th><th scope="col">RR/Budget</th><th scope="col">Status</th><th scope="col">Last Month</th>
+              </tr></thead>
+              <tbody id="tolDownsellBranchTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </div>
+
     <div id="solutionPartition" class="partition" hidden>
       <section>
-        <div class="section-title"><div><span>09</span><h2>Cancellation solution analysis</h2></div><p>สาเหตุการยกเลิกจาก Solution Name แยก TMH และ TOL</p></div>
+        <div class="section-title"><div><span>10</span><h2>Cancellation solution analysis</h2></div><p>สาเหตุการยกเลิกจาก Solution Name แยก TMH และ TOL</p></div>
         <div class="solution-controls">
           <div><strong>มุมมอง Solution</strong><small id="solutionDataNotice">กำลังโหลดข้อมูล...</small></div>
           <label>สาขา
