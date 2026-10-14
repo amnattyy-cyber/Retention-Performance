@@ -8,7 +8,7 @@ const SOLUTION_HEADERS = ["Report Date","Product","Area Group","Region","Shop Na
 const GVIZ_RANGES = {
   Performance_Daily: "A1:N1000",
   Downsell_Area_Daily: "A1:N1012",
-  Branch_Performance_Daily: "A1:AA1000",
+  Branch_Performance_Daily: "A1:AA1300",
   Downsell_Performance_Daily: "A1:S1000",
   Downsell_TOL_Daily: "A1:S1000",
   Solution_Performance_Daily: "A1:L5000"
