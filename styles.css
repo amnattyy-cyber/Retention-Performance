@@ -114,3 +114,16 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
 [data-service="tol"] #areaFocusSection .focus-table-badges span+span{background:#e4f3ff;color:#1268ad}
 [data-service="tol"] #areaFocusSection .focus-table .grand-total td,
 [data-service="tol"] #areaFocusSection .focus-table .grand-total .region-cell{background:#d9edfa!important;border-top-color:#398dbb}
+
+/* Performance by Branch switches to the TOL blue palette when TOL is selected */
+[data-service="tol"] #branchPartition .branch-table thead .group-region{background:#54a9e0;color:#102f4c}
+[data-service="tol"] #branchPartition .branch-table .group-request,[data-service="tol"] #branchPartition .branch-table .sub-request{background:#a8daf5;color:#143c5b}
+[data-service="tol"] #branchPartition .branch-table .group-save,[data-service="tol"] #branchPartition .branch-table .sub-save{background:#75bfe9;color:#123958}
+[data-service="tol"] #branchPartition .branch-table .group-churn,[data-service="tol"] #branchPartition .branch-table .sub-churn{background:#247fb8;color:#fff}
+[data-service="tol"] #branchPartition .branch-table .group-rate,[data-service="tol"] #branchPartition .branch-table .sub-rate{background:#c8e8f9;color:#143c5b}
+[data-service="tol"] #branchPartition .branch-table .group-budget,[data-service="tol"] #branchPartition .branch-table .group-meta{background:#e4f3fc;color:#143c5b}
+[data-service="tol"] #branchPartition .branch-table .group-tier{background:#d5ebf8;color:#143c5b}
+[data-service="tol"] #branchPartition .branch-table tbody tr:hover td,[data-service="tol"] #branchPartition .branch-table tbody tr:hover .branch-cell{background:#edf8ff}
+[data-service="tol"] #branchPartition .branch-table tbody tr.is-focus td,[data-service="tol"] #branchPartition .branch-table tbody tr.is-focus .branch-cell{background:#e0f2ff;box-shadow:inset 0 2px #2c91cb,inset 0 -2px #2c91cb}
+[data-service="tol"] #branchPartition .focus-table-badges span+span{background:#e4f3ff;color:#1268ad}
+[data-service="tol"] #branchPartition .branch-table .grand-total td,[data-service="tol"] #branchPartition .branch-table .grand-total .branch-cell{background:#d9edfa!important;border-top-color:#398dbb}
