@@ -267,6 +267,8 @@ function summarizeBranchRows(rows,service){
   return item;
 }
 
+const hasBranchActivityOrTarget=row=>[row.budget,row.mtdBudget,row.requestSep,row.requestOct,row.saveSep,row.saveOct,row.churnSep,row.churnOct].some(value=>n(value)!==0);
+
 function branchFocusData(service,group,region,shopType="ALL"){
   let pool=store.branches.filter(row=>(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)&&(shopType==="ALL"||normalizeShopType(row["Shop Type"])===shopType));
   const latest=[...new Set(pool.map(row=>row["Report Date"]))].sort().at(-1);
@@ -274,7 +276,7 @@ function branchFocusData(service,group,region,shopType="ALL"){
   const grouped=new Map();
   pool.forEach(row=>{const key=service==="ALL"?`${row.Region}|${row["Shop Name"]}`:`${row.Service}|${row.Region}|${row["Shop Name"]}`,items=grouped.get(key)||[];items.push(row);grouped.set(key,items);});
   const label=service==="ALL"?"TMH + TOL":service;
-  return {latest,rows:[...grouped.values()].map(items=>summarizeBranchRows(items,label)).sort((a,b)=>a.region.localeCompare(b.region)||b.overBudget-a.overBudget||a.shop.localeCompare(b.shop))};
+  return {latest,rows:[...grouped.values()].map(items=>summarizeBranchRows(items,label)).filter(hasBranchActivityOrTarget).sort((a,b)=>a.region.localeCompare(b.region)||b.overBudget-a.overBudget||a.shop.localeCompare(b.shop))};
 }
 
 function branchRowHtml(row){
