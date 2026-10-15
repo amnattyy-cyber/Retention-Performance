@@ -309,12 +309,14 @@ function downsellDetailData(level,group,region){
   let pool=source.filter(row=>inScope(row.Region,group,region));
   const latest=[...new Set(pool.map(row=>row["Report Date"]))].sort().at(-1);
   pool=pool.filter(row=>row["Report Date"]===latest);
+  if(level==="BRANCH") pool=pool.filter(hasDownsellBudgetOrTransaction);
   const sortRisk=(a,b)=>n(b["RR / Budget"])-n(a["RR / Budget"]);
   if(level==="AREA") pool.sort((a,b)=>sortRisk(a,b)||String(a.Region).localeCompare(String(b.Region)));
   else pool.sort((a,b)=>String(a.Region).localeCompare(String(b.Region))||sortRisk(a,b)||String(a["Shop Name"]).localeCompare(String(b["Shop Name"])));
   return {latest,rows:pool};
 }
 
+const hasDownsellBudgetOrTransaction=row=>n(row["Budget Downsell"])!==0||n(row["Total Downsell"])!==0;
 const budgetStatus=row=>n(row["RR / Budget"])>1?"over":"safe";
 function downsellAreaRowHtml(row){
   const state=budgetStatus(row);
@@ -331,7 +333,7 @@ function renderDownsellTolTables(group,region){
   const latest=source.map(row=>row["Report Date"]).sort().at(-1);
   const rows=source.filter(row=>row["Report Date"]===latest&&inScope(row.Region,group,region));
   const areas=rows.filter(row=>String(row.Level).toUpperCase()==="AREA").sort((a,b)=>n(b["RR / Budget"])-n(a["RR / Budget"]));
-  const branches=rows.filter(row=>String(row.Level).toUpperCase()==="BRANCH").sort((a,b)=>String(a.Region).localeCompare(String(b.Region))||n(b["RR / Budget"])-n(a["RR / Budget"])||String(a["Shop Name"]).localeCompare(String(b["Shop Name"])));
+  const branches=rows.filter(row=>String(row.Level).toUpperCase()==="BRANCH"&&hasDownsellBudgetOrTransaction(row)).sort((a,b)=>String(a.Region).localeCompare(String(b.Region))||n(b["RR / Budget"])-n(a["RR / Budget"])||String(a["Shop Name"]).localeCompare(String(b["Shop Name"])));
   $("tolDownsellDate").textContent=fmtDate(latest);
   $("tolDownsellAreaScope").textContent=scope;$("tolDownsellBranchScope").textContent=scope;
   $("tolDownsellAreaCount").textContent=`${areas.length} ${areas.length===1?"Area":"Areas"}`;
