@@ -2,7 +2,7 @@ const SPREADSHEET_ID = "1gw9c97wtVitsn5B8P9ugwavD4xOGf3M_RScNGvk_hNM";
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`;
 const PERF_HEADERS = ["Report Date","Service","Region","No Shop","Rev Request","Rev Save","Churn Value","Budget Churn Month","Cutoff Day","Days in Month","Save Rate","RR Churn","RR / Cap","Tier"];
 const DOWN_HEADERS = ["Report Date","Region","No Shop","Budget Downsell","Downsell Retention","Downsell Aftersale","Cutoff Day","Days in Month","Total Downsell","RR Downsell","MTD / Budget","RR / Budget","Over Budget Records","Status"];
-const BRANCH_HEADERS = ["Report Date","Service","Area Group","Region","Shop Name","Shop Type","Request Jul","Request Aug","Request MoM","Request %MoM","Save Jul","Save Aug","Save MoM","Save %MoM","Churn Jul","Churn Aug","Churn MoM","Churn %MoM","Save Rate Jul","Save Rate Aug","Save Rate MoM","Budget Churn","MTD Budget Churn","Over Budget","Tier","Cutoff Day","Days in Month"];
+const BRANCH_HEADERS = ["Report Date","Service","Area Group","Region","Shop Name","Shop Type","Request Sep","Request Oct","Request MoM","Request %MoM","Save Sep","Save Oct","Save MoM","Save %MoM","Churn Sep","Churn Oct","Churn MoM","Churn %MoM","Save Rate Sep","Save Rate Oct","Save Rate MoM","Budget Churn","MTD Budget Churn","Over Budget","Tier","Cutoff Day","Days in Month"];
 const DOWNSELL_DETAIL_HEADERS = ["Report Date","Level","Area Group","Region","Shop Name","Shop Type","No Shop","Budget Downsell","Downsell Retention","Downsell Aftersale","Total Downsell","RR Downsell","MTD / Budget","RR / Budget","Over Budget Records","Status","Last Month","Cutoff Day","Days in Month"];
 const SOLUTION_HEADERS = ["Report Date","Product","Area Group","Region","Shop Name","Solution Name","Request Sub","Rev Request","Rev Save","Churn Value","Cutoff Day","Days in Month"];
 const GVIZ_RANGES = {
@@ -19,7 +19,7 @@ const AREA_GROUPS = {
   UPC2: ["UPC - Central","UPC - East","UPC - Upper South","UPC - West","UPC - Lower South"]
 };
 let store = { performance: [], downsell: [], branches: [], downsellDetails: [], solutions: [], live: false, branchLive: false, downsellDetailLive: false, solutionLive: false };
-let comparisonMonths = { before: "July", now: "August" };
+let comparisonMonths = { before: "September", now: "October" };
 const periodTemplates = new Map();
 
 function renderPeriodLabels(prior, latest){
@@ -30,11 +30,11 @@ function renderPeriodLabels(prior, latest){
   };
   comparisonMonths={before:month(prior),now:month(latest)};
   document.querySelectorAll("h2,p,caption,th").forEach(element=>{
-    if(!periodTemplates.has(element) && /July|August|Jul-26|Aug-26/.test(element.textContent)) periodTemplates.set(element,element.textContent);
+    if(!periodTemplates.has(element) && /September|October|Sep-26|Oct-26/.test(element.textContent)) periodTemplates.set(element,element.textContent);
   });
   periodTemplates.forEach((template,element)=>{
-    const labels={"Jul-26":month(prior,true),"Aug-26":month(latest,true),July:comparisonMonths.before,August:comparisonMonths.now};
-    element.textContent=template.replace(/Jul-26|Aug-26|July|August/g,key=>labels[key]);
+    const labels={"Sep-26":month(prior,true),"Oct-26":month(latest,true),September:comparisonMonths.before,October:comparisonMonths.now};
+    element.textContent=template.replace(/Sep-26|Oct-26|September|October/g,key=>labels[key]);
   });
 }
 
@@ -137,7 +137,8 @@ async function loadData(){
 
 function populateRegions(){
   const select=$("regionFilter"),group=$("areaGroupFilter").value,current=select.value;
-  const regions=[...new Set([...store.performance.map(row=>row.Region),...store.downsell.map(row=>row.Region),...store.branches.map(row=>row.Region),...store.downsellDetails.map(row=>row.Region),...store.solutions.map(row=>row.Region)].filter(region=>region&&region!=="ALL"&&(group==="ALL"||AREA_GROUPS[group]?.includes(region))))].sort();
+  const validRegions=new Set(Object.values(AREA_GROUPS).flat());
+  const regions=[...new Set([...store.performance.map(row=>row.Region),...store.downsell.map(row=>row.Region),...store.branches.map(row=>row.Region),...store.downsellDetails.map(row=>row.Region),...store.solutions.map(row=>row.Region)].filter(region=>validRegions.has(region)&&(group==="ALL"||AREA_GROUPS[group]?.includes(region))))].sort();
   select.innerHTML='<option value="ALL">ทุกพื้นที่ในกลุ่ม</option>'+regions.map(region=>`<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`).join("");
   select.value=regions.includes(current)?current:"ALL";
 }
@@ -152,7 +153,9 @@ function latestRows(service,group,region){
   if(store.live) pool=pool.filter(row=>inScope(row.Region,group,region));
   else if(group==="ALL"&&region==="ALL"&&pool.some(row=>row.Region==="ALL")) pool=pool.filter(row=>row.Region==="ALL");
   else pool=pool.filter(row=>inScope(row.Region,group,region));
-  const dates=[...new Set(pool.map(row=>row["Report Date"]))].sort(),latest=dates.at(-1),prior=dates.at(-2);
+  const dates=[...new Set(pool.map(row=>row["Report Date"]))].sort(),latest=dates.at(-1);
+  const priorDate=new Date(latest+"T00:00:00");priorDate.setMonth(priorDate.getMonth()-1);const priorMonth=priorDate.toISOString().slice(0,7);
+  const prior=dates.filter(date=>date.slice(0,7)===priorMonth).at(-1)||dates.filter(date=>date<latest).at(-1);
   return {latest,prior,now:pool.filter(row=>row["Report Date"]===latest),before:pool.filter(row=>row["Report Date"]===prior)};
 }
 
@@ -190,18 +193,18 @@ function areaSummary(rows){
 }
 
 function tierStatus(row){
-  if(row.overBudget<=1&&row.saveRateAug>=.88) return {code:"T1",text:"T1 • In Cap / Save ≥ 88%"};
-  if(row.overBudget>1&&row.saveRateAug>=.88) return {code:"T2",text:"T2 • Over Cap / Save ≥ 88%"};
-  if(row.overBudget>1&&row.saveRateAug<.88) return {code:"T3",text:"T3 • Over Cap / Save < 88%"};
+  if(row.overBudget<=1&&row.saveRateOct>=.88) return {code:"T1",text:"T1 • In Cap / Save ≥ 88%"};
+  if(row.overBudget>1&&row.saveRateOct>=.88) return {code:"T2",text:"T2 • Over Cap / Save ≥ 88%"};
+  if(row.overBudget>1&&row.saveRateOct<.88) return {code:"T3",text:"T3 • Over Cap / Save < 88%"};
   return {code:"WATCH",text:"Watch • In Cap / Save < 88%"};
 }
 
 function comparisonRow(region,july,august){
-  const row={region,requestJul:july.request,requestAug:august.request,saveJul:july.save,saveAug:august.save,churnJul:july.churn,churnAug:august.churn,saveRateJul:july.saveRate,saveRateAug:august.saveRate,budget:august.budget,mtdBudget:august.mtdBudget,overBudget:august.overBudget};
-  row.requestDiff=row.requestAug-row.requestJul;row.requestMom=delta(row.requestAug,row.requestJul);
-  row.saveDiff=row.saveAug-row.saveJul;row.saveMom=delta(row.saveAug,row.saveJul);
-  row.churnDiff=row.churnAug-row.churnJul;row.churnMom=delta(row.churnAug,row.churnJul);
-  row.saveRateDiff=row.saveRateAug-row.saveRateJul;row.tier=tierStatus(row);
+  const row={region,requestSep:july.request,requestOct:august.request,saveSep:july.save,saveOct:august.save,churnSep:july.churn,churnOct:august.churn,saveRateSep:july.saveRate,saveRateOct:august.saveRate,budget:august.budget,mtdBudget:august.mtdBudget,overBudget:august.overBudget};
+  row.requestDiff=row.requestOct-row.requestSep;row.requestMom=delta(row.requestOct,row.requestSep);
+  row.saveDiff=row.saveOct-row.saveSep;row.saveMom=delta(row.saveOct,row.saveSep);
+  row.churnDiff=row.churnOct-row.churnSep;row.churnMom=delta(row.churnOct,row.churnSep);
+  row.saveRateDiff=row.saveRateOct-row.saveRateSep;row.tier=tierStatus(row);
   return row;
 }
 
@@ -217,7 +220,7 @@ const tone=(value,inverse=false)=>deltaClass(value,inverse);
 const serviceClass=service=>service==="TMH"?"tmh":service==="TOL"?"tol":"all";
 function focusRowHtml(row,selectedRegion,isTotal=false){
   const selected=!isTotal&&selectedRegion!=="ALL"&&row.region===selectedRegion;
-  return `<tr class="${isTotal?"grand-total ":""}${selected?"is-focus":""}"${selected?' aria-current="true"':""}><th class="region-cell" scope="row">${escapeHtml(row.region)}${selected?'<span class="focus-mark">Focus</span>':""}</th><td>${fmtFull(row.requestJul)}</td><td>${fmtFull(row.requestAug)}</td><td class="cell-tone ${tone(row.requestDiff,true)}">${fmtSignedFull(row.requestDiff)}</td><td class="cell-tone ${tone(row.requestMom,true)}">${fmtDelta(row.requestMom)}</td><td>${fmtFull(row.saveJul)}</td><td>${fmtFull(row.saveAug)}</td><td class="cell-tone ${tone(row.saveDiff)}">${fmtSignedFull(row.saveDiff)}</td><td class="cell-tone ${tone(row.saveMom)}">${fmtDelta(row.saveMom)}</td><td>${fmtFull(row.churnJul)}</td><td>${fmtFull(row.churnAug)}</td><td class="cell-tone ${tone(row.churnDiff,true)}">${fmtSignedFull(row.churnDiff)}</td><td class="cell-tone ${tone(row.churnMom,true)}">${fmtDelta(row.churnMom)}</td><td>${fmtPct(row.saveRateJul)}</td><td>${fmtPct(row.saveRateAug)}</td><td class="cell-tone ${tone(row.saveRateDiff)}">${fmtPP(row.saveRateDiff)}</td><td>${fmtFull(row.budget)}</td><td>${fmtFull(row.mtdBudget)}</td><td class="over-budget ${row.overBudget>1?"bad":"good"}">${fmtPct(row.overBudget)}</td><td><span class="tier-pill ${row.tier.code.toLowerCase()}" title="${escapeHtml(row.tier.text)}">${row.tier.code}</span></td></tr>`;
+  return `<tr class="${isTotal?"grand-total ":""}${selected?"is-focus":""}"${selected?' aria-current="true"':""}><th class="region-cell" scope="row">${escapeHtml(row.region)}${selected?'<span class="focus-mark">Focus</span>':""}</th><td>${fmtFull(row.requestSep)}</td><td>${fmtFull(row.requestOct)}</td><td class="cell-tone ${tone(row.requestDiff,true)}">${fmtSignedFull(row.requestDiff)}</td><td class="cell-tone ${tone(row.requestMom,true)}">${fmtDelta(row.requestMom)}</td><td>${fmtFull(row.saveSep)}</td><td>${fmtFull(row.saveOct)}</td><td class="cell-tone ${tone(row.saveDiff)}">${fmtSignedFull(row.saveDiff)}</td><td class="cell-tone ${tone(row.saveMom)}">${fmtDelta(row.saveMom)}</td><td>${fmtFull(row.churnSep)}</td><td>${fmtFull(row.churnOct)}</td><td class="cell-tone ${tone(row.churnDiff,true)}">${fmtSignedFull(row.churnDiff)}</td><td class="cell-tone ${tone(row.churnMom,true)}">${fmtDelta(row.churnMom)}</td><td>${fmtPct(row.saveRateSep)}</td><td>${fmtPct(row.saveRateOct)}</td><td class="cell-tone ${tone(row.saveRateDiff)}">${fmtPP(row.saveRateDiff)}</td><td>${fmtFull(row.budget)}</td><td>${fmtFull(row.mtdBudget)}</td><td class="over-budget ${row.overBudget>1?"bad":"good"}">${fmtPct(row.overBudget)}</td><td><span class="tier-pill ${row.tier.code.toLowerCase()}" title="${escapeHtml(row.tier.text)}">${row.tier.code}</span></td></tr>`;
 }
 
 function renderAreaFocusTable(service,group,selectedRegion){
@@ -258,9 +261,9 @@ function renderInsights(now,before,areas,downsell){
 }
 
 function summarizeBranchRows(rows,service){
-  const requestJul=sum(rows,"Request Jul"),requestAug=sum(rows,"Request Aug"),saveJul=sum(rows,"Save Jul"),saveAug=sum(rows,"Save Aug"),churnJul=sum(rows,"Churn Jul"),churnAug=sum(rows,"Churn Aug"),budget=sum(rows,"Budget Churn"),mtdBudget=sum(rows,"MTD Budget Churn");
-  const item={shop:rows[0]["Shop Name"],region:rows[0].Region,service,shopType:[...new Set(rows.map(row=>row["Shop Type"]).filter(Boolean))].join(" / "),requestJul,requestAug,saveJul,saveAug,churnJul,churnAug,budget,mtdBudget,saveRateJul:requestJul?saveJul/requestJul:0,saveRateAug:requestAug?saveAug/requestAug:0,overBudget:mtdBudget?churnAug/mtdBudget:0};
-  item.requestDiff=requestAug-requestJul;item.requestMom=delta(requestAug,requestJul);item.saveDiff=saveAug-saveJul;item.saveMom=delta(saveAug,saveJul);item.churnDiff=churnAug-churnJul;item.churnMom=delta(churnAug,churnJul);item.saveRateDiff=item.saveRateAug-item.saveRateJul;item.tier=tierStatus(item);
+  const requestSep=sum(rows,"Request Sep"),requestOct=sum(rows,"Request Oct"),saveSep=sum(rows,"Save Sep"),saveOct=sum(rows,"Save Oct"),churnSep=sum(rows,"Churn Sep"),churnOct=sum(rows,"Churn Oct"),budget=sum(rows,"Budget Churn"),mtdBudget=sum(rows,"MTD Budget Churn");
+  const item={shop:rows[0]["Shop Name"],region:rows[0].Region,service,shopType:[...new Set(rows.map(row=>row["Shop Type"]).filter(Boolean))].join(" / "),requestSep,requestOct,saveSep,saveOct,churnSep,churnOct,budget,mtdBudget,saveRateSep:requestSep?saveSep/requestSep:0,saveRateOct:requestOct?saveOct/requestOct:0,overBudget:mtdBudget?churnOct/mtdBudget:0};
+  item.requestDiff=requestOct-requestSep;item.requestMom=delta(requestOct,requestSep);item.saveDiff=saveOct-saveSep;item.saveMom=delta(saveOct,saveSep);item.churnDiff=churnOct-churnSep;item.churnMom=delta(churnOct,churnSep);item.saveRateDiff=item.saveRateOct-item.saveRateSep;item.tier=tierStatus(item);
   return item;
 }
 
@@ -275,14 +278,14 @@ function branchFocusData(service,group,region,shopType="ALL"){
 }
 
 function branchRowHtml(row){
-  return `<tr><th class="branch-cell" scope="row"><strong>${escapeHtml(row.shop)}</strong><small>${escapeHtml(row.shopType)}</small></th><td class="area-cell">${escapeHtml(row.region)}</td><td><span class="service-pill ${serviceClass(row.service)}">${escapeHtml(row.service.replace(" + ","+"))}</span></td><td>${fmtFull(row.requestJul)}</td><td>${fmtFull(row.requestAug)}</td><td class="cell-tone ${tone(row.requestDiff,true)}">${fmtSignedFull(row.requestDiff)}</td><td class="cell-tone ${tone(row.requestMom,true)}">${fmtDelta(row.requestMom)}</td><td>${fmtFull(row.saveJul)}</td><td>${fmtFull(row.saveAug)}</td><td class="cell-tone ${tone(row.saveDiff)}">${fmtSignedFull(row.saveDiff)}</td><td class="cell-tone ${tone(row.saveMom)}">${fmtDelta(row.saveMom)}</td><td>${fmtFull(row.churnJul)}</td><td>${fmtFull(row.churnAug)}</td><td class="cell-tone ${tone(row.churnDiff,true)}">${fmtSignedFull(row.churnDiff)}</td><td class="cell-tone ${tone(row.churnMom,true)}">${fmtDelta(row.churnMom)}</td><td>${fmtPct(row.saveRateJul)}</td><td>${fmtPct(row.saveRateAug)}</td><td class="cell-tone ${tone(row.saveRateDiff)}">${fmtPP(row.saveRateDiff)}</td><td>${fmtFull(row.budget)}</td><td>${fmtFull(row.mtdBudget)}</td><td class="over-budget ${row.overBudget>1?"bad":"good"}">${fmtPct(row.overBudget)}</td><td><span class="tier-pill ${row.tier.code.toLowerCase()}" title="${escapeHtml(row.tier.text)}">${row.tier.code}</span></td></tr>`;
+  return `<tr><th class="branch-cell" scope="row"><strong>${escapeHtml(row.shop)}</strong><small>${escapeHtml(row.shopType)}</small></th><td class="area-cell">${escapeHtml(row.region)}</td><td><span class="service-pill ${serviceClass(row.service)}">${escapeHtml(row.service.replace(" + ","+"))}</span></td><td>${fmtFull(row.requestSep)}</td><td>${fmtFull(row.requestOct)}</td><td class="cell-tone ${tone(row.requestDiff,true)}">${fmtSignedFull(row.requestDiff)}</td><td class="cell-tone ${tone(row.requestMom,true)}">${fmtDelta(row.requestMom)}</td><td>${fmtFull(row.saveSep)}</td><td>${fmtFull(row.saveOct)}</td><td class="cell-tone ${tone(row.saveDiff)}">${fmtSignedFull(row.saveDiff)}</td><td class="cell-tone ${tone(row.saveMom)}">${fmtDelta(row.saveMom)}</td><td>${fmtFull(row.churnSep)}</td><td>${fmtFull(row.churnOct)}</td><td class="cell-tone ${tone(row.churnDiff,true)}">${fmtSignedFull(row.churnDiff)}</td><td class="cell-tone ${tone(row.churnMom,true)}">${fmtDelta(row.churnMom)}</td><td>${fmtPct(row.saveRateSep)}</td><td>${fmtPct(row.saveRateOct)}</td><td class="cell-tone ${tone(row.saveRateDiff)}">${fmtPP(row.saveRateDiff)}</td><td>${fmtFull(row.budget)}</td><td>${fmtFull(row.mtdBudget)}</td><td class="over-budget ${row.overBudget>1?"bad":"good"}">${fmtPct(row.overBudget)}</td><td><span class="tier-pill ${row.tier.code.toLowerCase()}" title="${escapeHtml(row.tier.text)}">${row.tier.code}</span></td></tr>`;
 }
 
 function hallCard(service,group,region){
   let pool=store.branches.filter(row=>row.Service===service&&normalizeShopType(row["Shop Type"])==="Hall"&&inScope(row.Region,group,region));
   const latest=[...new Set(pool.map(row=>row["Report Date"]))].sort().at(-1);
   pool=pool.filter(row=>row["Report Date"]===latest&&row["Shop Name"]);
-  const requestBefore=sum(pool,"Request Jul"),requestNow=sum(pool,"Request Aug"),saveNow=sum(pool,"Save Aug"),churnNow=sum(pool,"Churn Aug"),budget=sum(pool,"Budget Churn");
+  const requestBefore=sum(pool,"Request Sep"),requestNow=sum(pool,"Request Oct"),saveNow=sum(pool,"Save Oct"),churnNow=sum(pool,"Churn Oct"),budget=sum(pool,"Budget Churn");
   const cutoff=n(pool[0]?.["Cutoff Day"]),days=n(pool[0]?.["Days in Month"]),rr=cutoff?churnNow/cutoff*days:0,saveRate=requestNow?saveNow/requestNow:0,rrCap=budget?rr/budget:0;
   const branches=new Set(pool.map(row=>row["Shop Name"])).size;
   return `<article class="hall-service-card ${service.toLowerCase()}"><div class="hall-card-head"><div><small>SHOP TYPE</small><h3>Hall • ${service}</h3></div><strong>${branches} สาขา</strong></div><div class="hall-card-period"><span>${comparisonMonths.before} ${fmtMoney(requestBefore)}</span><b>→</b><span>${comparisonMonths.now} ${fmtMoney(requestNow)}</span></div><div class="hall-card-metrics"><div><small>Request</small><strong>${fmtMoney(requestNow)}</strong></div><div><small>Save</small><strong>${fmtMoney(saveNow)}</strong></div><div><small>Churn</small><strong>${fmtMoney(churnNow)}</strong></div><div><small>Save rate</small><strong>${fmtPct(saveRate)}</strong></div><div><small>RR / Cap</small><strong>${fmtPct(rrCap)}</strong></div></div></article>`;
