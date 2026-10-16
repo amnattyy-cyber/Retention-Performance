@@ -8,7 +8,7 @@ const SOLUTION_HEADERS = ["Report Date","Product","Area Group","Region","Shop Na
 const GVIZ_RANGES = {
   Performance_Daily: "A1:N1000",
   Downsell_Area_Daily: "A1:N1012",
-  Branch_Performance_Daily: "A1:AA1300",
+  Branch_Performance_Daily: "A1:AA1600",
   Downsell_Performance_Daily: "A1:S1000",
   Downsell_TOL_Daily: "A1:S1000",
   Solution_Performance_Daily: "A1:L5000"
@@ -464,4 +464,6 @@ document.querySelectorAll(".partition-tab").forEach(button=>button.addEventListe
 $("captureModeButton").addEventListener("click",()=>{const active=document.body.classList.toggle("capture-mode");$("captureModeButton").textContent=active?"✕ ออกจากโหมด Capture":"⛶ โหมด Capture";});
 $("sheetLink").href=SHEET_URL;
 loadData();
+window.setInterval(()=>{if(document.visibilityState==="visible")loadData();},5*60*1000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")loadData();});
 
