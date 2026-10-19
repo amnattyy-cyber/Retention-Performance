@@ -577,6 +577,58 @@ function render(){
   renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();renderPageFocus(service,group,region);
 }
 
+
+let tableCaptureState=null;
+function installTableCaptureButtons(){
+ document.querySelectorAll(".partition table").forEach(table=>{
+  const wrap=table.closest(".table-scroll")||table.parentElement;
+  if(wrap.previousElementSibling?.classList.contains("table-capture-tools"))return;
+  const tools=document.createElement("div");tools.className="table-capture-tools";
+  const button=document.createElement("button");button.type="button";button.className="table-capture-button";button.textContent="⛶ Capture ตารางเต็มกรอบ";
+  button.addEventListener("click",()=>openTableCapture(wrap.querySelector("table")));
+  tools.appendChild(button);wrap.before(tools);
+ });
+}
+function openTableCapture(table){
+ if(!table)return;
+ const dialog=$("tableCaptureDialog"),sheet=$("tableCaptureSheet"),container=table.closest("article,.focus-table-card,.solution-matrix-card,.solution-comparison-card");
+ const heading=container?.querySelector("h3,h2")?.textContent||table.caption?.textContent||"Performance";
+ const scope=["serviceFilter","areaGroupFilter","regionFilter"].map(id=>$(id)?.selectedOptions?.[0]?.textContent).filter(Boolean);
+ if(table.closest("#branchPartition"))scope.push($("shopTypeFilter").selectedOptions[0].textContent);
+ if(table.closest("#solutionPartition"))scope.push($("solutionBranchFilter").selectedOptions[0].textContent);
+ sheet.replaceChildren();
+ const title=document.createElement("h2");title.textContent=heading;
+ const detail=document.createElement("p");detail.textContent=scope.join(" • ");
+ const notice=container?.querySelector(".data-notice,.branch-data-notice");
+ if(notice?.textContent)detail.textContent+=" • "+notice.textContent;
+ const copy=table.cloneNode(true);
+ copy.removeAttribute("id");copy.querySelectorAll("[id]").forEach(el=>el.removeAttribute("id"));
+ copy.querySelectorAll("th,td").forEach(cell=>{cell.style.setProperty("position","static","important");cell.style.setProperty("overflow","visible","important");cell.style.setProperty("text-overflow","clip","important");});
+ copy.querySelectorAll("caption").forEach(el=>el.remove());
+ sheet.append(title,detail,copy);
+ // Preserve actual column widths and colors in the captured table.
+ const originals=table.querySelectorAll("th,td"),copies=copy.querySelectorAll("th,td");
+ originals.forEach((cell,i)=>{const style=getComputedStyle(cell);["background-color","color","border-color","font-weight"].forEach(key=>copies[i].style.setProperty(key,style.getPropertyValue(key)));});
+ const width=Math.max(table.scrollWidth,table.getBoundingClientRect().width,900);
+ copy.style.setProperty("width","100%","important");copy.style.setProperty("min-width","0","important");copy.style.setProperty("table-layout","auto","important");copy.style.fontSize="14px";
+ sheet.style.width=(width+48)+"px";
+ tableCaptureState={opener:document.activeElement,mode:"frame"};
+ dialog.showModal();requestAnimationFrame(()=>fitTableCapture("frame"));
+}
+function fitTableCapture(mode){
+ if(!tableCaptureState)return;
+ tableCaptureState.mode=mode;
+ const sheet=$("tableCaptureSheet"),stage=$("tableCaptureStage"),frame=$("tableCaptureFrame");
+ sheet.style.transform="none";
+ const w=sheet.offsetWidth,h=sheet.offsetHeight;
+ const scale=mode==="actual"?1:Math.min(1,(stage.clientWidth-32)/w,...(mode==="frame"?[(stage.clientHeight-32)/h]:[]));
+ sheet.style.transform=`scale(${scale})`;
+ frame.style.width=Math.ceil(w*scale)+"px";frame.style.height=Math.ceil(h*scale)+"px";
+ $("tableCaptureZoom").textContent=Math.round(scale*100)+"%";
+ stage.scrollTop=0;stage.scrollLeft=0;
+}
+function closeTableCapture(){const opener=tableCaptureState?.opener;$("tableCaptureDialog").close();tableCaptureState=null;opener?.focus();}
+
 function setPartition(partition){
   document.querySelectorAll(".partition-tab").forEach(button=>{const active=button.dataset.partition===partition;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active));});
   $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("downsellTolPartition").hidden=partition!=="downsellTol";$("solutionPartition").hidden=partition!=="solution";
@@ -591,6 +643,17 @@ $("solutionMetricFilter").addEventListener("change",renderSolutions);
 $("refreshButton").addEventListener("click",loadData);
 document.querySelectorAll(".partition-tab").forEach(button=>button.addEventListener("click",()=>setPartition(button.dataset.partition)));
 $("captureModeButton").addEventListener("click",()=>{const active=document.body.classList.toggle("capture-mode");$("captureModeButton").textContent=active?"✕ ออกจากโหมด Capture":"⛶ โหมด Capture";});
+$("tableCaptureClose").addEventListener("click",closeTableCapture);
+$("tableCaptureFit").addEventListener("click",()=>fitTableCapture("frame"));
+$("tableCaptureWidth").addEventListener("click",()=>fitTableCapture("width"));
+$("tableCaptureActual").addEventListener("click",()=>fitTableCapture("actual"));
+$("tableCapturePrint").addEventListener("click",()=>window.print());
+$("tableCaptureDialog").addEventListener("cancel",event=>{event.preventDefault();closeTableCapture();});
+window.addEventListener("resize",()=>{if(tableCaptureState)fitTableCapture(tableCaptureState.mode);});
+let captureInstallPending=false;
+const captureObserver=new MutationObserver(()=>{if(captureInstallPending)return;captureInstallPending=true;requestAnimationFrame(()=>{captureInstallPending=false;installTableCaptureButtons();});});
+document.querySelectorAll(".partition").forEach(part=>captureObserver.observe(part,{childList:true,subtree:true}));
+installTableCaptureButtons();
 $("sheetLink").href=SHEET_URL;
 loadData();
 window.setInterval(()=>{if(document.visibilityState==="visible")loadData();},5*60*1000);
