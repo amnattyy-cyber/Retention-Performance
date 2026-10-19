@@ -154,3 +154,36 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
 [data-service="tol"] .customer-table thead th{background:#dff0fc;color:#175982}
 @media(max-width:1100px){.customer-breakdown-grid{grid-template-columns:1fr}}
 @media(max-width:700px){.customer-count-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-revenue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-findings ul{grid-template-columns:1fr}.customer-metric{padding:14px}}
+
+/* Readable report tables across all performance pages. */
+.partition .focus-table{
+  width:100%;min-width:1200px;table-layout:auto;font-size:14px;line-height:1.5;
+}
+.partition .focus-table th,.partition .focus-table td{
+  padding:12px 10px;overflow:visible;text-overflow:clip;
+}
+.partition .focus-table thead th{font-size:14px;line-height:1.5}
+.partition .performance-table{min-width:2200px}
+.partition .performance-table thead tr:first-child th{height:48px;box-sizing:border-box}
+.partition .performance-table thead tr:nth-child(2) th{top:48px}
+.partition .branch-table .branch-cell,.partition .branch-table thead .group-region{
+  min-width:270px;max-width:320px;width:280px;padding:12px;
+}
+.partition .branch-table .branch-cell strong{font-size:14px;max-width:none;white-space:normal;line-height:1.5}
+.partition .branch-table .branch-cell small{font-size:13px;line-height:1.5}
+.partition .branch-table .area-cell{min-width:170px;white-space:normal;line-height:1.5}
+.partition .focus-table .tier-pill,.partition .focus-table .budget-pill{font-size:13px;padding:5px 8px}
+.partition .focus-table .focus-mark{font-size:12px}
+.partition .capture-table{min-width:1450px}
+.partition .capture-table .branch-name{min-width:270px;max-width:320px;white-space:normal;line-height:1.5}
+.partition .capture-table .area-name{min-width:170px;max-width:220px;white-space:normal;line-height:1.5}
+.partition .downsell-branch-table th:first-child,.partition .tol-downsell-branch-table th:first-child{width:280px}
+.partition .solution-branch-table th:nth-child(2){min-width:270px}
+.partition .solution-branch-table td:nth-child(4){min-width:240px;max-width:340px;line-height:1.5}
+.partition .table-scroll{scrollbar-width:auto}
+.partition .focus-table-toolbar p{font-size:14px;line-height:1.5}
+.partition .focus-table-badges span{font-size:13px}
+@media(max-width:720px){
+ .partition .focus-table th,.partition .focus-table td{padding:10px 8px}
+ .partition .branch-table .branch-cell,.partition .branch-table thead .group-region{min-width:220px;max-width:250px;width:230px}
+}
