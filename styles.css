@@ -187,3 +187,31 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
  .partition .focus-table th,.partition .focus-table td{padding:10px 8px}
  .partition .branch-table .branch-cell,.partition .branch-table thead .group-region{min-width:220px;max-width:250px;width:230px}
 }
+
+/* Per-table capture view: no clipped rows or columns. */
+.table-capture-tools{display:flex;justify-content:flex-end;padding:10px 16px;background:#f5f8fc;border-bottom:1px solid #e1e7f0}
+.table-capture-button,.table-capture-bar button{border:1px solid #c8d5e6;border-radius:8px;padding:9px 14px;background:white;color:#17385b;font-family:inherit;font-weight:600;font-size:14px;cursor:pointer}
+.table-capture-button:hover,.table-capture-bar button:hover{background:#e5f2ff}
+.table-capture-dialog{width:calc(100vw - 24px);height:calc(100dvh - 24px);max-width:none;max-height:none;padding:0;border:0;border-radius:14px;background:#eef2f7;color:#172d4f}
+.table-capture-dialog::backdrop{background:rgba(15,25,45,.75)}
+.table-capture-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 18px;background:white;border-bottom:1px solid #d9e1ee}
+.table-capture-bar strong{margin-right:auto}.table-capture-help{font-size:13px;margin:10px 18px}
+#tableCaptureStage{height:calc(100% - 120px);overflow:auto;padding:16px;box-sizing:border-box}
+#tableCaptureFrame{position:relative;margin:0 auto}
+#tableCaptureSheet{position:absolute;top:0;left:0;transform-origin:top left;box-sizing:border-box;background:white;padding:24px;color:#172d4f}
+#tableCaptureSheet h2{font-size:22px;margin:0 0 8px}
+#tableCaptureSheet>p{font-size:14px;margin:0 0 18px}
+#tableCaptureSheet table{border-collapse:separate;border-spacing:0;font-size:14px}
+#tableCaptureSheet th,#tableCaptureSheet td{padding:10px 9px;font-size:14px;line-height:1.5;border-bottom:1px solid #dce4ed;white-space:nowrap}
+#tableCaptureSheet .branch-cell,#tableCaptureSheet .branch-name,#tableCaptureSheet .area-name{white-space:normal;min-width:220px;line-height:1.5}
+#tableCaptureSheet .branch-cell strong{max-width:none;white-space:normal}
+#tableCaptureSheet small,#tableCaptureSheet .budget-pill,#tableCaptureSheet .tier-pill{font-size:13px}
+@media print{
+ body:has(#tableCaptureDialog[open])>*:not(#tableCaptureDialog){display:none!important}
+ #tableCaptureDialog[open]{position:static;width:100%;height:auto;overflow:visible;background:white}
+ #tableCaptureDialog .table-capture-bar,#tableCaptureDialog .table-capture-help{display:none}
+ #tableCaptureStage,#tableCaptureFrame{height:auto!important;width:100%!important;overflow:visible;padding:0}
+ #tableCaptureSheet{position:static;transform:none!important;width:100%!important;padding:0}
+ #tableCaptureSheet table{width:100%!important;min-width:0!important}
+ #tableCaptureSheet th,#tableCaptureSheet td{white-space:normal;min-width:0!important}
+}
