@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261020-readable">
+  <link rel="stylesheet" href="styles.css?v=20261020-capture">
 </head>
 <body>
   <header class="hero">
@@ -376,9 +376,16 @@
   <footer>
     <div class="shell"><div><strong>Retention Performance Command Center</strong><span>อัปเดตผ่าน Google Sheet • Area + Branch (ซ่อน TDS/WW)</span></div><p>ข้อมูลนี้ใช้เพื่อการบริหารผลการดำเนินงานภายใน</p></div>
   </footer>
+  <dialog id="tableCaptureDialog" class="table-capture-dialog" aria-labelledby="tableCaptureTitle">
+    <div class="table-capture-bar"><strong id="tableCaptureTitle">Capture ตาราง</strong><span id="tableCaptureZoom"></span>
+      <button type="button" id="tableCaptureFit">เต็มกรอบ</button><button type="button" id="tableCaptureWidth">พอดีความกว้าง</button><button type="button" id="tableCaptureActual">ขนาดจริง 100%</button><button type="button" id="tableCapturePrint">พิมพ์ / บันทึก PDF</button><button type="button" id="tableCaptureClose">✕ ปิด</button>
+    </div>
+    <p class="table-capture-help">เต็มกรอบแสดงครบทุกแถวและคอลัมน์ • ตารางยาวเลือกขนาดจริงเพื่ออ่านรายละเอียด • ใช้เครื่องมือแคปหน้าจอเพื่อบันทึกรูป</p>
+    <div id="tableCaptureStage"><div id="tableCaptureFrame"><div id="tableCaptureSheet"></div></div></div>
+  </dialog>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20261020-tol-fix"></script>
+  <script src="app.js?v=20261020-capture"></script>
 </body>
 </html>
 
