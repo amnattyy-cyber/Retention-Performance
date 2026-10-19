@@ -428,6 +428,7 @@ function renderSolutionBranches(products,group,region,metric){
 
 function renderSolutions(){
   populateSolutionBranches();
+  renderSolutionFocus();
   const service=$("serviceFilter").value,products=solutionProducts(service),group=$("areaGroupFilter").value,region=$("regionFilter").value,branch=$("solutionBranchFilter").value,metric=$("solutionMetricFilter").value,{latest}=latestSolutionRows(),scope=[scopeLabel(group,region),branch!=="ALL"?branch:null].filter(Boolean).join(" • ");
   $("solutionDataNotice").textContent=store.solutionLive?`ข้อมูล ณ ${fmtDate(latest)} • ไฟล์ 12 Oct ไม่มีจำนวน Request Sub จึงยังใช้ข้อมูลชุดเดิม`:(store.solutions.length?`ข้อมูล ณ ${fmtDate(latest)} • ใช้ Snapshot สำรอง`:"ไม่สามารถโหลดข้อมูล Solution ได้ กรุณาตรวจสิทธิ์ Google Sheet");
   $("solutionLeaderScope").textContent=scope;$("solutionComparisonScope").textContent=scope;
@@ -489,7 +490,73 @@ function renderHomeOverview(service,group,region){
     const lows=branchRows.filter(r=>n(r["Request Oct"])>0).map(r=>({name:r["Shop Name"],product:r.Service,rate:n(r["Save Oct"])/n(r["Request Oct"])})).sort((a,b)=>a.rate-b.rate).slice(0,3);
     if(lows.length)findings.push(`<b>สาขาที่ควรติดตาม (%Save Revenue ต่ำสุด):</b> ${lows.map(r=>`${escapeHtml(r.name)} (${escapeHtml(r.product)}) <strong>${fmtPct(r.rate)}</strong>`).join(" • ")}`);
   } else findings.push("ไม่มีข้อมูลตามตัวกรองที่เลือก");
+  if(data.now.length){
+    const risks=[...areaMapForFocus(data.now)].sort((a,b)=>b.churn-a.churn).slice(0,5);
+    findings.push(`พื้นที่ที่มี Churn สูงสุด: ${risks.map(r=>`${escapeHtml(r.name)} ฿${fmtFull(r.churn)} (${total.churn?fmtPct(r.churn/total.churn):"—"} ของกลุ่ม)`).join(" • ")}`);
+    findings.push("แนวทางติดตาม: เริ่มจากพื้นที่ที่มีมูลค่า Churn สูง ตรวจสาขา Save ต่ำและเคสมูลค่าสูงในหน้า Branch Performance แล้วใช้หน้า Solution เพื่อกำหนด Action ตามสาเหตุ พร้อมติดตามผลรอบถัดไป");
+  }
   $("customerFindings").innerHTML=findings.map(t=>`<li>${t}</li>`).join("");
+}
+
+
+function areaMapForFocus(rows){const map=new Map();rows.forEach(r=>map.set(r.Region,(map.get(r.Region)||0)+n(r["Churn Value"])));return [...map].map(([name,churn])=>({name,churn}));}
+function focusCard(label,value,note=""){return `<article class="customer-metric"><small>${label}</small><strong>${value}</strong><span>${escapeHtml(note)}</span></article>`;}
+function focusMom(current,previous){return previous?(current>previous?"+":"")+fmtPct((current-previous)/previous):"—";}
+function focusPanel(id,title,date,cards,findings){
+  $(id).innerHTML=`<div class="section-title"><div><h2>${title}</h2></div><p>ข้อมูล ณ ${fmtDate(date)}</p></div><div class="customer-revenue-grid">${cards}</div><article class="panel customer-findings"><h3>🔎 บทสรุปและประเด็นที่ควรติดตาม</h3><ul>${findings.map(t=>`<li>${t}</li>`).join("")}</ul></article>`;
+}
+function renderBranchFocus(service,group,region){
+ const data=branchFocusData(service,group,region,$("shopTypeFilter").value),rows=data.rows;
+ const total=key=>rows.reduce((v,r)=>v+n(r[key]),0),request=total("requestOct"),save=total("saveOct"),churn=total("churnOct"),budget=total("mtdBudget");
+ const cards=focusCard("REVENUE REQ","฿"+fmtFull(request))+focusCard("REVENUE SAVE","฿"+fmtFull(save))+focusCard("%REVENUE SAVE",request?fmtPct(save/request):"—")+focusCard("CHURN VALUE","฿"+fmtFull(churn))+focusCard("%MoM SAVE",focusMom(save,total("saveSep")),"Sep → Oct")+focusCard("%MoM CHURN VALUE",focusMom(churn,total("churnSep")),"Sep → Oct");
+ const low=rows.filter(r=>r.requestOct>0&&r.saveRateOct<.88).sort((a,b)=>b.churnOct-a.churnOct),over=rows.filter(r=>r.mtdBudget>0&&r.churnOct>r.mtdBudget).sort((a,b)=>(b.churnOct-b.mtdBudget)-(a.churnOct-a.mtdBudget));
+ const name=r=>escapeHtml(r.shop)+" ("+escapeHtml(r.region)+")";
+ const findings=rows.length?[
+ `ครอบคลุม <b>${rows.length} สาขา</b> • Save ฿${fmtFull(save)} จาก Request ฿${fmtFull(request)} • Churn ฿${fmtFull(churn)}`,
+ `Save Revenue ต่ำกว่าเกณฑ์ติดตาม 88% จำนวน <b>${low.length} สาขา</b> • Churn รวม ฿${fmtFull(low.reduce((v,r)=>v+r.churnOct,0))}`,
+ low.length?`ชี้เป้าสาขา Save ต่ำ เรียงตามมูลค่า Churn: ${low.slice(0,5).map(r=>`${name(r)} — Save ${fmtPct(r.saveRateOct)}, Churn ฿${fmtFull(r.churnOct)}`).join(" • ")}`:"ทุกสาขาที่มี Request ผ่านเกณฑ์ Save Revenue 88%",
+ budget?`Churn / Budget MTD รวม <b>${fmtPct(churn/budget)}</b> • เกิน Budget MTD ${over.length} สาขา`:"ไม่มี Budget MTD สำหรับเทียบยอดรวม",
+ over.length?`สาขาที่เกิน Budget MTD สูงสุด: ${over.slice(0,3).map(r=>`${name(r)} เกิน ฿${fmtFull(r.churnOct-r.mtdBudget)}`).join(" • ")}`:"ไม่มีสาขาเกิน Budget MTD ในกลุ่มที่มี Budget",
+ "แนวทางติดตาม: ให้หัวหน้าสาขากลุ่ม Save ต่ำตรวจเคสยกเลิกที่มีมูลค่าสูงและข้อเสนอที่ใช้ แล้วสรุปผล Save/Churn ในรอบถัดไป; กลุ่มเกิน Budget ให้กำหนดผู้รับผิดชอบและติดตามรายวัน"
+ ]:["ไม่มีข้อมูลตามตัวกรอง"];
+ focusPanel("branchFocus","Retention • Branch Focus",data.latest,cards,findings);
+}
+function renderDownsellFocus(id,product,source,group,region){
+ const pool=source.filter(r=>inScope(r.Region,group,region)),date=pool.map(r=>r["Report Date"]).sort().at(-1),now=pool.filter(r=>r["Report Date"]===date);
+ const areas=now.filter(r=>String(r.Level).toUpperCase()==="AREA"),branches=now.filter(r=>String(r.Level).toUpperCase()==="BRANCH"&&hasDownsellBudgetOrTransaction(r)),base=areas.length?areas:branches;
+ const budget=sum(base,"Budget Downsell"),actual=sum(base,"Total Downsell"),rr=sum(base,"RR Downsell");
+ const rank=rows=>rows.filter(r=>n(r["Budget Downsell"])>0&&n(r["RR Downsell"])>n(r["Budget Downsell"])).sort((a,b)=>(n(b["RR Downsell"])-n(b["Budget Downsell"]))-(n(a["RR Downsell"])-n(a["Budget Downsell"])));
+ const over=rank(branches),riskAreas=rank(areas),unknown=branches.filter(r=>!n(r["Budget Downsell"])&&n(r["Total Downsell"])>0);
+ const cards=focusCard("BUDGET","฿"+fmtFull(budget))+focusCard("DOWNSELL MTD","฿"+fmtFull(actual))+focusCard("RUN RATE","฿"+fmtFull(rr))+focusCard("RR / BUDGET",budget?fmtPct(rr/budget):"—")+focusCard("PROJECTED OVER BUDGET","฿"+fmtFull(Math.max(0,rr-budget)))+focusCard("BRANCHES OVER BUDGET",fmtFull(over.length),"เทียบ Run rate กับ Budget");
+ const findings=base.length?[
+ `${product} • Downsell MTD ฿${fmtFull(actual)} • Run rate ฿${fmtFull(rr)} • Budget ฿${fmtFull(budget)} ${areas.length?"(ยอดรวมระดับพื้นที่)":"(ยอดรวมจากสาขาที่มีข้อมูล)"}`,
+ `Run rate ${rr>budget?"สูงกว่า":"ไม่เกิน"} Budget ฿${fmtFull(Math.abs(rr-budget))} • Retention ฿${fmtFull(sum(base,"Downsell Retention"))} / Aftersale ฿${fmtFull(sum(base,"Downsell Aftersale"))}`,
+ riskAreas.length?`พื้นที่ควรติดตาม เรียงตามมูลค่าเกิน Budget: ${riskAreas.slice(0,5).map(r=>`${escapeHtml(r.Region)} — ${fmtPct(n(r["RR Downsell"])/n(r["Budget Downsell"]))}, เกิน ฿${fmtFull(n(r["RR Downsell"])-n(r["Budget Downsell"]))}`).join(" • ")}`:"ไม่มีพื้นที่ที่ Run rate เกิน Budget ในกลุ่มที่มี Budget",
+ over.length?`ชี้เป้า 5 สาขาที่เกินสูงสุด: ${over.slice(0,5).map(r=>`${escapeHtml(r["Shop Name"])} (${escapeHtml(r.Region)}) เกิน ฿${fmtFull(n(r["RR Downsell"])-n(r["Budget Downsell"]))}`).join(" • ")}`:"ไม่มีสาขาที่ Run rate เกิน Budget ในกลุ่มที่มี Budget",
+ `มี Downsell แต่ไม่มี Budget ${unknown.length} สาขา${unknown.length?" — ควรตรวจการกำหนด Budget ก่อนประเมินผล":""}`,
+ "แนวทางติดตาม: ตรวจเคสลดแพ็กเกจของพื้นที่และสาขาที่เกิน Budget สูงสุด แยก Retention/Aftersale เพื่อหาจุดที่ลดรายได้มาก และทบทวนข้อเสนอรักษารายได้ก่อนอนุมัติส่วนลด พร้อมติดตาม Run rate ทุกวัน"
+ ]:["ไม่มีข้อมูลตามตัวกรอง"];
+ focusPanel(id,"Downsell "+product+" • Focus",date,cards,findings);
+}
+function renderSolutionFocus(){
+ const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value,branch=$("solutionBranchFilter").value;
+ const rows=solutionScopeRows(service,group,region,branch),date=latestSolutionRows().latest,request=sum(rows,"Rev Request"),save=sum(rows,"Rev Save"),churn=sum(rows,"Churn Value");
+ const cards=focusCard("REVENUE REQ","฿"+fmtFull(request))+focusCard("REVENUE SAVE","฿"+fmtFull(save))+focusCard("%REVENUE SAVE",request?fmtPct(save/request):"—")+focusCard("CHURN VALUE","฿"+fmtFull(churn));
+ const rank=key=>{const map=new Map();rows.forEach(r=>{const name=r[key]||"ไม่ระบุ";map.set(name,(map.get(name)||0)+n(r["Churn Value"]));});return [...map].sort((a,b)=>b[1]-a[1]);};
+ const reasons=rank("Solution Name"),shops=rank("Shop Name");
+ const findings=rows.length?[
+ `สรุปจากข้อมูล Solution ณ ${fmtDate(date)} • Request ฿${fmtFull(request)} • Save ฿${fmtFull(save)} • Churn ฿${fmtFull(churn)}`,
+ `5 สาเหตุที่มี Churn สูงสุด: ${reasons.slice(0,5).map(([name,value])=>`${escapeHtml(name)} ฿${fmtFull(value)} (${churn?fmtPct(value/churn):"—"})`).join(" • ")}`,
+ `5 สาขาที่มี Churn สูงสุดในข้อมูล Solution: ${shops.slice(0,5).map(([name,value])=>`${escapeHtml(name)} ฿${fmtFull(value)}`).join(" • ")}`,
+ `สาเหตุอันดับหนึ่งคิดเป็น ${churn&&reasons.length?fmtPct(reasons[0][1]/churn):"—"} ของ Churn — ให้เริ่มทบทวนเคสกลุ่มนี้กับสาขาที่มีมูลค่าสูงก่อน`,
+ "แนวทางติดตาม: ตรวจรายละเอียดเคสเพื่อยืนยันสาเหตุและข้อเสนอที่เคยใช้ กำหนด Action และผู้รับผิดชอบตามสาเหตุ แล้วติดตามมูลค่า Save/Churn ในรอบถัดไป ข้อมูลนี้แสดงการกระจุกตัวของยอด ยังไม่ยืนยันสาเหตุเชิงลึก"
+ ]:["ไม่มีข้อมูล Solution ตามตัวกรอง"];
+ focusPanel("solutionFocus","Solution • Focus",date,cards,findings);
+}
+function renderPageFocus(service,group,region){
+ renderBranchFocus(service,group,region);
+ renderDownsellFocus("downsellFocus","TMH",store.downsellDetails,group,region);
+ renderDownsellFocus("downsellTolFocus","TOL",store.tolDownsellDetails,group,region);
 }
 
 function render(){
@@ -502,7 +569,7 @@ function render(){
   const areaPool=store.performance.filter(row=>row["Report Date"]===data.latest&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)),areas=groupAreas(areaPool);
   bars("saveRateBars",areas,"saveRate",{max:1,sort:"asc",kind:"teal",noteKey:item=>item.saveRate<.88?"ต่ำกว่าเป้าหมาย 88%":"ผ่านเป้าหมาย 88%"});
   bars("runRateBars",areas,"rrCap",{max:Math.max(1.6,...areas.map(item=>item.rrCap)),sort:"desc",kind:"warn",noteKey:item=>item.rrCap>1?`เกิน Cap ${fmtPct(item.rrCap-1)}`:"อยู่ใน Cap"});
-  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();
+  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();renderPageFocus(service,group,region);
 }
 
 function setPartition(partition){
