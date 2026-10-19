@@ -442,18 +442,29 @@ function customerSummary(rows, branch=false){
   return {request,save,churn,rate:request?save/request:null};
 }
 function customerSummaryTable(items,label){
-  const headers=[label,"Req (Sub)","Save (Sub)","Cancel (Sub)","%Save (Sub)","%Churn (Sub)","Rev Req ฿","Rev Save ฿","%Save Rev","Churn ฿"];
-  const cells=item=>`<th scope="row">${escapeHtml(item.name)}</th><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>${fmtFull(item.request)}</td><td>${fmtFull(item.save)}</td><td class="customer-rate">${item.rate===null?"—":fmtPct(item.rate)}</td><td>${fmtFull(item.churn)}</td>`;
+  const headers=[label,"Rev Req ฿","Rev Save ฿","%Save Rev","Churn ฿"];
+  const cells=item=>`<th scope="row">${escapeHtml(item.name)}</th><td>${fmtFull(item.request)}</td><td>${fmtFull(item.save)}</td><td class="customer-rate">${item.rate===null?"—":fmtPct(item.rate)}</td><td>${fmtFull(item.churn)}</td>`;
   const totals=items.reduce((t,r)=>({name:"Total",request:t.request+r.request,save:t.save+r.save,churn:t.churn+r.churn}),{name:"Total",request:0,save:0,churn:0});
   totals.rate=totals.request?totals.save/totals.request:null;
-  return `<table class="customer-table"><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${items.length?items.map(r=>`<tr>${cells(r)}</tr>`).join(""):'<tr><td colspan="10" class="empty-state">ไม่มีข้อมูลตามตัวกรอง</td></tr>'}</tbody>${items.length?`<tfoot><tr>${cells(totals)}</tr></tfoot>`:""}</table>`;
+  return `<table class="customer-table"><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${items.length?items.map(r=>`<tr>${cells(r)}</tr>`).join(""):'<tr><td colspan="5" class="empty-state">ไม่มีข้อมูลตามตัวกรอง</td></tr>'}</tbody>${items.length?`<tfoot><tr>${cells(totals)}</tr></tfoot>`:""}</table>`;
 }
 function renderHomeOverview(service,group,region){
   const data=latestRows(service,group,region),total=customerSummary(data.now);
   $("customerScope").textContent=`${service==="ALL"?"TMH + TOL":service} • ${scopeLabel(group,region)} • ${fmtDate(data.latest)}`;
   const card=(label,value,note,kind="")=>`<article class="customer-metric ${kind}"><small>${label}</small><strong>${value}</strong><span>${note}</span></article>`;
-  $("customerCounts").innerHTML=["REQ","SAVE","CANCEL","%SAVE (SUB)","%CHURN (SUB)"].map(label=>card(label,"—","รอข้อมูลจำนวนลูกค้า")).join("");
+
   $("customerRevenue").innerHTML=card("REVENUE REQ",data.now.length?"฿"+fmtFull(total.request):"—","รายได้ที่ขอยกเลิก")+card("REVENUE SAVE",data.now.length?"฿"+fmtFull(total.save):"—","รายได้ที่รักษาไว้","customer-save")+card("%REVENUE SAVE",total.rate===null?"—":fmtPct(total.rate),"Revenue Save / Revenue Req","customer-save")+card("CHURN (VALUE)",data.now.length?"฿"+fmtFull(total.churn):"—","มูลค่ารายได้ที่ยกเลิก","customer-cancel");
+
+  const priorMonthDate=data.latest?new Date(data.latest+"T00:00:00"):null;
+  if(priorMonthDate){priorMonthDate.setDate(1);priorMonthDate.setMonth(priorMonthDate.getMonth()-1);}
+  const previousMonth=priorMonthDate?priorMonthDate.getFullYear()+"-"+String(priorMonthDate.getMonth()+1).padStart(2,"0"):null;
+  const hasPreviousMonth=Boolean(data.prior&&data.prior.slice(0,7)===previousMonth&&data.before.length);
+  const previous=customerSummary(hasPreviousMonth?data.before:[]);
+  const mom=(current,base)=>hasPreviousMonth&&base!==0?(current-base)/base:null;
+  const saveMom=mom(total.save,previous.save),churnMom=mom(total.churn,previous.churn);
+  const momValue=value=>value===null?"—":(value>0?"+":"")+fmtPct(value);
+  const momNote=hasPreviousMonth?`${fmtDate(data.prior)} → ${fmtDate(data.latest)}`:"ไม่มีฐานเดือนก่อนสำหรับเปรียบเทียบ";
+  $("customerRevenue").innerHTML+=card("%MoM SAVE",momValue(saveMom),momNote,saveMom===null?"":saveMom>=0?"customer-save":"customer-cancel")+card("%MoM CHURN VALUE",momValue(churnMom),momNote,churnMom===null?"":churnMom<=0?"customer-save":"customer-cancel");
   const products=["TMH","TOL"].filter(p=>service==="ALL"||p===service).map(p=>({name:p,...customerSummary(data.now.filter(r=>r.Service===p))})).filter(p=>data.now.some(r=>r.Service===p.name));
   $("customerProductTable").innerHTML=customerSummaryTable(products,"Product");
   // Only use branch data from the same reporting date as the overview.
