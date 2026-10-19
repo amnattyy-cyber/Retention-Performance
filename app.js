@@ -154,6 +154,7 @@ function latestRows(service,group,region){
   else if(group==="ALL"&&region==="ALL"&&pool.some(row=>row.Region==="ALL")) pool=pool.filter(row=>row.Region==="ALL");
   else pool=pool.filter(row=>inScope(row.Region,group,region));
   const dates=[...new Set(pool.map(row=>row["Report Date"]))].sort(),latest=dates.at(-1);
+  if(!latest)return {latest:null,prior:null,now:[],before:[]};
   const priorDate=new Date(latest+"T00:00:00");priorDate.setMonth(priorDate.getMonth()-1);const priorMonth=priorDate.toISOString().slice(0,7);
   const prior=dates.filter(date=>date.slice(0,7)===priorMonth).at(-1)||dates.filter(date=>date<latest).at(-1);
   return {latest,prior,now:pool.filter(row=>row["Report Date"]===latest),before:pool.filter(row=>row["Report Date"]===prior)};
@@ -435,11 +436,56 @@ function renderSolutions(){
   renderSolutionMatrices(products,group,region,metric,branch);renderSolutionBranches(products,group,region,metric);
 }
 
+
+function customerSummary(rows, branch=false){
+  const request=sum(rows,branch?"Request Oct":"Rev Request"),save=sum(rows,branch?"Save Oct":"Rev Save"),churn=sum(rows,branch?"Churn Oct":"Churn Value");
+  return {request,save,churn,rate:request?save/request:null};
+}
+function customerSummaryTable(items,label){
+  const headers=[label,"Req (Sub)","Save (Sub)","Cancel (Sub)","%Save (Sub)","%Churn (Sub)","Rev Req ฿","Rev Save ฿","%Save Rev","Churn ฿"];
+  const cells=item=>`<th scope="row">${escapeHtml(item.name)}</th><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>${fmtFull(item.request)}</td><td>${fmtFull(item.save)}</td><td class="customer-rate">${item.rate===null?"—":fmtPct(item.rate)}</td><td>${fmtFull(item.churn)}</td>`;
+  const totals=items.reduce((t,r)=>({name:"Total",request:t.request+r.request,save:t.save+r.save,churn:t.churn+r.churn}),{name:"Total",request:0,save:0,churn:0});
+  totals.rate=totals.request?totals.save/totals.request:null;
+  return `<table class="customer-table"><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${items.length?items.map(r=>`<tr>${cells(r)}</tr>`).join(""):'<tr><td colspan="10" class="empty-state">ไม่มีข้อมูลตามตัวกรอง</td></tr>'}</tbody>${items.length?`<tfoot><tr>${cells(totals)}</tr></tfoot>`:""}</table>`;
+}
+function renderHomeOverview(service,group,region){
+  const data=latestRows(service,group,region),total=customerSummary(data.now);
+  $("customerScope").textContent=`${service==="ALL"?"TMH + TOL":service} • ${scopeLabel(group,region)} • ${fmtDate(data.latest)}`;
+  const card=(label,value,note,kind="")=>`<article class="customer-metric ${kind}"><small>${label}</small><strong>${value}</strong><span>${note}</span></article>`;
+  $("customerCounts").innerHTML=["REQ","SAVE","CANCEL","%SAVE (SUB)","%CHURN (SUB)"].map(label=>card(label,"—","รอข้อมูลจำนวนลูกค้า")).join("");
+  $("customerRevenue").innerHTML=card("REVENUE REQ",data.now.length?"฿"+fmtFull(total.request):"—","รายได้ที่ขอยกเลิก")+card("REVENUE SAVE",data.now.length?"฿"+fmtFull(total.save):"—","รายได้ที่รักษาไว้","customer-save")+card("%REVENUE SAVE",total.rate===null?"—":fmtPct(total.rate),"Revenue Save / Revenue Req","customer-save")+card("CHURN (VALUE)",data.now.length?"฿"+fmtFull(total.churn):"—","มูลค่ารายได้ที่ยกเลิก","customer-cancel");
+  const products=["TMH","TOL"].filter(p=>service==="ALL"||p===service).map(p=>({name:p,...customerSummary(data.now.filter(r=>r.Service===p))})).filter(p=>data.now.some(r=>r.Service===p.name));
+  $("customerProductTable").innerHTML=customerSummaryTable(products,"Product");
+  // Only use branch data from the same reporting date as the overview.
+  const branchRows=store.branches.filter(r=>r["Report Date"]===data.latest&&(service==="ALL"||r.Service===service)&&inScope(r.Region,group,region)&&r["Shop Name"]&&(n(r["Request Oct"])!==0||n(r["Budget Churn"])!==0));
+  const types=[...new Set(branchRows.map(r=>normalizeShopType(r["Shop Type"])||"ไม่ระบุ"))].sort().map(type=>({name:type,...customerSummary(branchRows.filter(r=>(normalizeShopType(r["Shop Type"])||"ไม่ระบุ")===type),true)}));
+  $("customerTypeTable").innerHTML=customerSummaryTable(types,"Shop Type");
+  $("customerTypeNote").textContent="ใช้ Shop Type จากข้อมูลรายสาขา: Matching / Non Matching / Hall • Hall แสดงแยกตามข้อมูลต้นทาง";
+  const typeTotal=types.reduce((t,r)=>t+r.request,0);
+  if(branchRows.length&&Math.abs(typeTotal-total.request)>1)$("customerTypeNote").textContent+=" • ยอดรวมครอบคลุมเฉพาะสาขาที่มีข้อมูล จึงต่างจากยอดระดับพื้นที่";
+  const findings=[];
+  if(data.now.length){
+    findings.push(`Revenue Request <strong>฿${fmtFull(total.request)}</strong> → Save <strong>฿${fmtFull(total.save)} (${total.rate===null?"—":fmtPct(total.rate)})</strong> • Churn <strong>฿${fmtFull(total.churn)}</strong>`);
+    const rankedProducts=products.filter(p=>p.rate!==null).sort((a,b)=>b.rate-a.rate);
+    if(rankedProducts.length)findings.push(`<b>By Product:</b> ${rankedProducts.map(p=>`${escapeHtml(p.name)} Save Revenue <strong>${fmtPct(p.rate)}</strong>`).join(" • ")}`);
+    const rankTypes=types.filter(t=>t.rate!==null).sort((a,b)=>b.rate-a.rate);
+    if(rankTypes.length)findings.push(`<b>Shop Type:</b> Save Revenue สูงสุด ${escapeHtml(rankTypes[0].name)} <strong>${fmtPct(rankTypes[0].rate)}</strong>${rankTypes.length>1?` • ต่ำสุด ${escapeHtml(rankTypes.at(-1).name)} <strong>${fmtPct(rankTypes.at(-1).rate)}</strong>`:""}`);
+    const areaMap=new Map();data.now.forEach(r=>{const items=areaMap.get(r.Region)||[];items.push(r);areaMap.set(r.Region,items);});
+    const areas=[...areaMap].map(([name,rows])=>({name,...customerSummary(rows)})).filter(r=>r.rate!==null).sort((a,b)=>b.rate-a.rate);
+    if(areas.length)findings.push(`<b>Area:</b> Save Revenue สูงสุด ${escapeHtml(areas[0].name)} <strong>${fmtPct(areas[0].rate)}</strong>${areas.length>1?` • ต่ำสุด ${escapeHtml(areas.at(-1).name)} <strong>${fmtPct(areas.at(-1).rate)}</strong>`:""}`);
+    const budget=sum(data.now,"Budget Churn Month"),rr=sum(data.now,"RR Churn");
+    if(budget>0)findings.push(`<b>Churn Run rate:</b> <strong>฿${fmtFull(rr)}</strong> / Cap ฿${fmtFull(budget)} = <strong>${fmtPct(rr/budget)}</strong>`);
+    const lows=branchRows.filter(r=>n(r["Request Oct"])>0).map(r=>({name:r["Shop Name"],product:r.Service,rate:n(r["Save Oct"])/n(r["Request Oct"])})).sort((a,b)=>a.rate-b.rate).slice(0,3);
+    if(lows.length)findings.push(`<b>สาขาที่ควรติดตาม (%Save Revenue ต่ำสุด):</b> ${lows.map(r=>`${escapeHtml(r.name)} (${escapeHtml(r.product)}) <strong>${fmtPct(r.rate)}</strong>`).join(" • ")}`);
+  } else findings.push("ไม่มีข้อมูลตามตัวกรองที่เลือก");
+  $("customerFindings").innerHTML=findings.map(t=>`<li>${t}</li>`).join("");
+}
+
 function render(){
   const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value,data=latestRows(service,group,region),now=aggregatePerformance(data.now),before=aggregatePerformance(data.before);
   renderPeriodLabels(data.prior,data.latest);
   document.documentElement.dataset.service=service.toLowerCase();
-  $("performanceDate").textContent=fmtDate(data.latest);renderKpis(now,before);
+  $("performanceDate").textContent=fmtDate(data.latest);renderHomeOverview(service,group,region);
   $("serviceCards").innerHTML=service==="ALL"?serviceCard("TMH",group,region)+serviceCard("TOL",group,region):serviceCard(service,group,region);
   $("comparisonGrid").innerHTML=comparisonCard("Request",now.request,before.request)+comparisonCard("Save",now.save,before.save)+comparisonCard("Churn",now.churn,before.churn,true);
   const areaPool=store.performance.filter(row=>row["Report Date"]===data.latest&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)),areas=groupAreas(areaPool);
