@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261014c">
+  <link rel="stylesheet" href="styles.css?v=20261020-home">
 </head>
 <body>
   <header class="hero">
@@ -68,9 +68,17 @@
 
     <div id="overviewPartition" class="partition">
 
-    <section>
-      <div class="section-title"><div><span>01</span><h2>Executive snapshot</h2></div><p>ตัวเลขหลักของงวดล่าสุดตามตัวกรอง</p></div>
-      <div class="kpi-grid" id="kpiGrid"></div>
+    <section class="customer-overview" aria-labelledby="customerOverviewTitle">
+      <div class="section-title"><div><span>01</span><h2 id="customerOverviewTitle">Request ของลูกค้า — Save / Cancel</h2></div><p id="customerScope"></p></div>
+      <div class="customer-count-grid" id="customerCounts"></div>
+      <p class="customer-data-note">จำนวน Request / Save / Cancel (Sub) ยังไม่มีในข้อมูลที่เชื่อมอยู่ จะแสดง — จนกว่าจะมีข้อมูลจำนวนลูกค้า</p>
+      <h3 class="customer-subtitle">Revenue — รายได้ที่รักษาไว้</h3>
+      <div class="customer-revenue-grid" id="customerRevenue"></div>
+      <article class="panel customer-findings"><h3>🔎 Key Findings</h3><ul id="customerFindings"></ul></article>
+      <div class="customer-breakdown-grid">
+        <article class="panel"><div class="panel__head"><div><h3>By Product</h3><p>ตามตัวกรองบริการและพื้นที่ • หน่วยรายได้: บาท</p></div></div><div class="table-scroll" id="customerProductTable" tabindex="0" role="region" aria-label="สรุป By Product"></div></article>
+        <article class="panel"><div class="panel__head"><div><h3>By KPIType</h3><p id="customerTypeNote">ใช้ Shop Type จากข้อมูลรายสาขา: Matching / Non Matching / Hall</p></div></div><div class="table-scroll" id="customerTypeTable" tabindex="0" role="region" aria-label="สรุป By KPIType ตาม Shop Type"></div></article>
+      </div>
     </section>
 
     <section class="service-grid" id="serviceCards" aria-label="ผลการดำเนินงาน TMH และ TOL"></section>
@@ -368,7 +376,7 @@
   </footer>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20261019a"></script>
+  <script src="app.js?v=20261020-home"></script>
 </body>
 </html>
 
