@@ -49,6 +49,7 @@ const fmtPP = value => `${value>=0?"+":""}${(n(value)*100).toFixed(2)} pp`;
 const fmtDelta = value => `${value>=0?"+":""}${(n(value)*100).toFixed(1)}%`;
 const escapeHtml = value => String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
 const dateKey = value => {
+  if (typeof value==="number"&&value>20000&&value<80000) return new Date(Date.UTC(1899,11,30)+value*86400000).toISOString().slice(0,10);
   if (value instanceof Date) return value.toISOString().slice(0,10);
   const text=String(value||"");
   const match=text.match(/Date\((\d+),(\d+),(\d+)\)/);
@@ -78,6 +79,10 @@ function scopeLabel(group,region){
   return group==="ALL"?"ALL • 15 Areas":group;
 }
 
+function validDownsellRow(row){
+ const regions=Object.values(AREA_GROUPS).flat(),level=String(row.Level).toUpperCase();
+ return /^\d{4}-\d{2}-\d{2}$/.test(row["Report Date"])&&regions.includes(row.Region)&&["AREA","BRANCH"].includes(level)&&(level==="AREA"||typeof row["Shop Name"]==="string"&&/[a-zA-Zก-๙]/.test(row["Shop Name"]))&&["Budget Downsell","Total Downsell","RR Downsell"].every(k=>typeof row[k]==="number"&&Number.isFinite(row[k]));
+}
 function loadGviz(sheet){
   return new Promise((resolve,reject)=>{
     const callback=`__gviz_${sheet.replace(/\W/g,"_")}_${Date.now()}`;
@@ -91,7 +96,7 @@ function loadGviz(sheet){
     };
     script.onerror=()=>{cleanup();reject(new Error("network"));};
     const range=GVIZ_RANGES[sheet]||"A1:Z1000";
-    script.src=`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${callback}&sheet=${encodeURIComponent(sheet)}&range=${encodeURIComponent(range)}&headers=1`;
+    script.src=`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${callback}&sheet=${encodeURIComponent(sheet)}&range=${encodeURIComponent(range)}&headers=1&cache=${Date.now()}`;
     document.head.appendChild(script);
   });
 }
@@ -121,7 +126,7 @@ async function loadData(){
     downsell:coreLive?rowObjects(downsell.value,DOWN_HEADERS):rowObjects(window.RETENTION_FALLBACK.downsell,DOWN_HEADERS),
     branches:branches.status==="fulfilled"?rowObjects(branches.value,BRANCH_HEADERS):[],
     downsellDetails:downsellDetails.status==="fulfilled"?rowObjects(downsellDetails.value,DOWNSELL_DETAIL_HEADERS):[],
-    tolDownsellDetails:tolDownsellDetails.status==="fulfilled"?rowObjects(tolDownsellDetails.value,DOWNSELL_DETAIL_HEADERS):[],
+    tolDownsellDetails:tolDownsellDetails.status==="fulfilled"?rowObjects(tolDownsellDetails.value,DOWNSELL_DETAIL_HEADERS).filter(validDownsellRow):[],
     solutions:solutions.status==="fulfilled"?rowObjects(solutions.value,SOLUTION_HEADERS):solutionFallbackRows(),
     live:coreLive,
     branchLive:branches.status==="fulfilled",
