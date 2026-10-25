@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261020-capture">
+  <link rel="stylesheet" href="styles.css?v=20261025-executive">
 </head>
 <body>
   <header class="hero">
@@ -58,6 +58,7 @@
     </section>
 
     <nav class="partition-tabs" aria-label="เลือกมุมมอง Dashboard">
+      <button class="partition-tab" type="button" data-partition="executive" aria-selected="false">สรุปผู้บริหาร</button>
       <button class="partition-tab is-active" type="button" data-partition="overview" aria-selected="true">ภาพรวม Area</button>
       <button class="partition-tab" type="button" data-partition="branch" aria-selected="false">Branch Performance</button>
       <button class="partition-tab" type="button" data-partition="downsell" aria-selected="false">Downsell TMH</button>
@@ -66,7 +67,21 @@
       <button class="capture-toggle" id="captureModeButton" type="button">⛶ โหมด Capture</button>
     </nav>
 
+    <div id="executivePartition" class="partition" hidden>
+      <section aria-labelledby="executiveTitle">
+        <div class="section-title"><div><span>EX</span><h2 id="executiveTitle">สรุปผู้บริหาร • Revenue Save</h2></div><a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1gw9c97wtVitsn5B8P9ugwavD4xOGf3M_RScNGvk_hNM/edit#gid=166535888" target="_blank" rel="noopener">เปิดชีทสรุป ↗</a></div>
+        <p id="executiveScope"></p>
+        <div id="executiveContent"></div>
+        <article class="panel executive-block executive-note">
+          <div class="executive-note-head"><h3>Note สำหรับส่งผู้บริหาร</h3><button type="button" id="executiveCopy">คัดลอก Note</button></div>
+          <p id="executiveCopyStatus" role="status" aria-live="polite"></p>
+          <label for="executiveNote">สรุปตามบริการและพื้นที่ที่เลือก • พร้อมคัดลอกส่งรายงาน</label>
+          <textarea id="executiveNote" readonly rows="16"></textarea>
+        </article>
+      </section>
+    </div>
     <div id="overviewPartition" class="partition">
+      <div class="executive-shortcut"><div><strong>สรุปผู้บริหาร • โฟกัส Revenue Save</strong><p>ผล Save ทุกมุม พร้อมชี้เป้าสาขาและ Note สำหรับส่งรายงาน</p></div><button type="button" id="executiveShortcut">เปิดสรุปผู้บริหาร →</button></div>
 
     <section class="customer-overview" aria-labelledby="customerOverviewTitle">
       <div class="section-title"><div><span>01</span><h2 id="customerOverviewTitle">Request ของลูกค้า — Save / Cancel</h2></div><p id="customerScope"></p></div>
@@ -385,7 +400,7 @@
   </dialog>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20261020-capture"></script>
+  <script src="app.js?v=20261025-executive"></script>
 </body>
 </html>
 

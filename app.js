@@ -564,6 +564,92 @@ function renderPageFocus(service,group,region){
  renderDownsellFocus("downsellTolFocus","TOL",store.tolDownsellDetails,group,region);
 }
 
+
+/* Executive report: same live branch snapshot and scope as the dashboard. */
+function executiveMetrics(rows){
+ const save=sum(rows,"Save Oct"),previous=sum(rows,"Save Sep"),request=sum(rows,"Request Oct"),previousRequest=sum(rows,"Request Sep");
+ return {save,previous,request,rate:request?save/request:null,priorRate:previousRequest?previous/previousRequest:null,mom:previous?(save-previous)/previous:null,churn:sum(rows,"Churn Oct")};
+}
+function executiveModel(service,group,region){
+ const latest=store.branches.map(r=>r["Report Date"]).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().at(-1);
+ const rows=store.branches.filter(r=>r["Report Date"]===latest&&r["Shop Name"]&&(service==="ALL"||r.Service===service)&&inScope(r.Region,group,region));
+ const groups=key=>[...new Set(rows.map(key))].filter(Boolean).map(label=>({label,...executiveMetrics(rows.filter(r=>key(r)===label))})).filter(r=>r.request||r.save||r.previous);
+ const priority=rows.filter(r=>n(r["Request Oct"])>0&&n(r["Save Oct"])/n(r["Request Oct"])<.88).sort((a,b)=>n(b["Churn Oct"])-n(a["Churn Oct"])).slice(0,6);
+ const downsell=["TMH","TOL"].filter(p=>service==="ALL"||service===p).map(product=>{
+  const pool=(product==="TMH"?store.downsellDetails:store.tolDownsellDetails||[]).filter(r=>String(r.Level).toUpperCase()==="AREA");
+  const date=pool.map(r=>r["Report Date"]).sort().at(-1);
+  const selected=pool.filter(r=>r["Report Date"]===date&&inScope(r.Region,group,region));
+  const budget=sum(selected,"Budget Downsell"),rr=sum(selected,"RR Downsell");
+  return {product,date,available:selected.length>0,budget,rr,ratio:budget?rr/budget:null,total:sum(selected,"Total Downsell"),retention:sum(selected,"Downsell Retention"),aftersale:sum(selected,"Downsell Aftersale")};
+ });
+ return {latest,rows,total:executiveMetrics(rows),products:groups(r=>r.Service),groups:groups(r=>areaGroupFor(r.Region)),types:groups(r=>normalizeShopType(r["Shop Type"])),areas:groups(r=>r.Region).sort((a,b)=>(a.rate??1)-(b.rate??1)),bmav:["TMH","TOL"].filter(p=>rows.some(r=>r.Service===p&&r.Region==="BMA V - Central")).map(label=>({label,...executiveMetrics(rows.filter(r=>r.Service===label&&r.Region==="BMA V - Central"))})),priority,downsell};
+}
+const executivePct=value=>value===null?"—":(value*100).toFixed(2)+"%";
+const executiveMom=value=>value===null?"ไม่มีฐานเปรียบเทียบ":fmtDelta(value);
+function executiveTable(title,items,latest){
+ const current=new Date(latest+"T00:00:00"),prior=new Date(current);prior.setDate(1);prior.setMonth(prior.getMonth()-1);
+ const month=d=>isNaN(d)?"—":d.toLocaleDateString("en-US",{month:"short",year:"2-digit"});
+ return `<article class="panel executive-block"><h3>${escapeHtml(title)}</h3><div class="table-scroll"><table class="executive-table"><thead><tr><th>มุมมอง</th><th>Save ${month(prior)}</th><th>Save ${month(current)}</th><th>Save MoM</th><th>%Save</th><th>เปลี่ยนแปลง</th></tr></thead><tbody>${items.map(r=>`<tr><th scope="row">${escapeHtml(r.label)}</th><td>${fmtFull(r.previous)}</td><td class="executive-save">${fmtFull(r.save)}</td><td>${executiveMom(r.mom)}</td><td class="${r.rate!==null&&r.rate<.88?"executive-watch":"executive-save"}">${executivePct(r.rate)}</td><td>${r.rate===null||r.priorRate===null?"—":fmtPP(r.rate-r.priorRate)}</td></tr>`).join("")||'<tr><td colspan="6">ไม่มีข้อมูลตามตัวกรอง</td></tr>'}</tbody></table></div></article>`;
+}
+function renderExecutiveSummary(service,group,region){
+ const m=executiveModel(service,group,region),t=m.total,scope=(service==="ALL"?"TMH + TOL":service)+" • "+scopeLabel(group,region);
+ $("executiveScope").textContent=`${scope} • Retention ณ ${fmtDate(m.latest)} • ข้อมูลจากรอบล่าสุดของ Dashboard`;
+ $("executiveCopyStatus").textContent="";
+ if(!m.rows.length){
+  $("executiveContent").innerHTML='<article class="panel"><h3>ยังไม่มีข้อมูลสำหรับสรุป</h3><p>ไม่พบข้อมูลรายสาขารอบล่าสุดตามตัวกรอง กรุณาอัปเดตข้อมูลหรือเปลี่ยนพื้นที่</p></article>';
+  $("executiveNote").value="";$("executiveCopy").disabled=true;return;
+ }
+ $("executiveCopy").disabled=false;
+ const below=m.areas.filter(r=>r.rate!==null&&r.rate<.88),best=m.areas.filter(r=>r.rate!==null).at(-1);
+ const findings=[
+  `รักษารายได้ ${fmtFull(t.save)} บาท • Save ${executivePct(t.rate)} • MoM ${executiveMom(t.mom)}`,
+  `พื้นที่ผ่านเกณฑ์ Save 88% จำนวน ${m.areas.length-below.length}/${m.areas.length} พื้นที่${best?" • สูงสุด "+best.label+" ("+executivePct(best.rate)+")":""}`,
+  below.length?"พื้นที่ควรเร่งเพิ่ม Save: "+below.map(r=>r.label+" "+executivePct(r.rate)).join(" • "):"ทุกพื้นที่ที่มีข้อมูลผ่านเกณฑ์ Save 88%",
+  "ติดตามผล Save ควบคู่รายได้หลังปรับข้อเสนอ เพื่อรักษารายได้และควบคุม Downsell"
+ ];
+ const priorityHtml=`<article class="panel executive-block"><h3>สาขาที่ควรติดตาม • Save ต่ำกว่า 88%</h3><p>6 รายการที่มี Request เรียงตาม Churn สูงเพื่อชี้โอกาสรักษารายได้ • แยก TMH / TOL</p><div class="table-scroll"><table class="executive-table"><thead><tr><th>สาขา / พื้นที่</th><th>Product</th><th>Revenue Save</th><th>%Save</th><th>Churn รอง</th></tr></thead><tbody>${m.priority.map(r=>`<tr><th scope="row">${escapeHtml(r["Shop Name"])}<small>${escapeHtml(r.Region)}</small></th><td>${escapeHtml(r.Service)}</td><td class="executive-save">${fmtFull(r["Save Oct"])}</td><td class="executive-watch">${executivePct(n(r["Save Oct"])/n(r["Request Oct"]))}</td><td>${fmtFull(r["Churn Oct"])}</td></tr>`).join("")||'<tr><td colspan="5">ไม่มีรายการที่ Save ต่ำกว่า 88% ตามตัวกรอง</td></tr>'}</tbody></table></div></article>`;
+ const downHtml=`<article class="panel executive-block"><h3>คุณภาพการ Save • Downsell</h3><div class="table-scroll"><table class="executive-table"><thead><tr><th>Product / วันที่</th><th>Downsell MTD</th><th>Budget เดือน</th><th>Run rate</th><th>RR / Budget</th><th>Retention</th><th>Aftersale</th></tr></thead><tbody>${m.downsell.map(d=>d.available?`<tr><th>${d.product}<small>${fmtDate(d.date)}</small></th><td>${fmtFull(d.total)}</td><td>${fmtFull(d.budget)}</td><td>${fmtFull(d.rr)}</td><td class="${d.ratio>1?"executive-watch":""}">${executivePct(d.ratio)}</td><td>${fmtFull(d.retention)}</td><td>${fmtFull(d.aftersale)}</td></tr>`:`<tr><th>${d.product}</th><td colspan="6">ยังไม่มีข้อมูล Downsell ตามตัวกรอง</td></tr>`).join("")}</tbody></table></div><p>Run rate เป็นประมาณการจากค่าเฉลี่ยต่อวัน • วันที่ Downsell อาจต่างจาก Retention</p></article>`;
+ const actions=[
+  "RM/FRM และหัวหน้าสาขาทบทวนเคส Save ไม่สำเร็จ เริ่มจากสาขา Priority และเคสมูลค่าสูง พร้อมระบุผู้รับผิดชอบ",
+  "เสนอทางเลือกตามสาเหตุและเงื่อนไขที่ใช้ได้ เช่น ย้ายจุดติดตั้ง โอนผู้ใช้ ระงับชั่วคราว หรือปรับแพ็กเกจ",
+  "ติดตาม Revenue Save, %Save และรายได้หลังปรับข้อเสนอร่วมกัน แยก Retention / Aftersale เพื่อควบคุม Downsell",
+  "แลกเปลี่ยนแนวทางจากพื้นที่ Save สูง และติดตามผลรายวันในกลุ่มต่ำกว่า 88%"
+ ];
+ $("executiveContent").innerHTML=`
+  <div class="executive-kpis">
+   <article><small>REVENUE SAVE</small><strong>${(t.save/1e6).toFixed(2)} <span>ล้านบาท</span></strong><p>${fmtFull(t.save)} บาท</p></article>
+   <article><small>SAVE RATE</small><strong>${executivePct(t.rate)}</strong><p>${t.rate!==null&&t.priorRate!==null?fmtPP(t.rate-t.priorRate)+" จากเดือนก่อน":"ไม่มีฐานเปรียบเทียบ"}</p></article>
+   <article><small>SAVE MoM</small><strong>${t.mom===null?"—":fmtDelta(t.mom)}</strong><p>เทียบจำนวนวันตามข้อมูลต้นทาง</p></article>
+  </div>
+  <article class="panel executive-block"><h3>Key Findings • ชี้เป้าเพิ่ม Save</h3><ul class="executive-findings">${findings.map(s=>"<li>"+escapeHtml(s)+"</li>").join("")}</ul></article>
+  ${executiveTable("By Product",m.products,m.latest)}
+  <div class="executive-pair">${executiveTable("By Area Group",m.groups,m.latest)}${executiveTable("By Shop Type",m.types,m.latest)}</div>
+  ${executiveTable("Performance by Area",m.areas,m.latest)}
+  ${priorityHtml}
+  ${m.bmav.length?executiveTable("Focus • BMA V – Central",m.bmav,m.latest):""}
+  ${downHtml}
+  <article class="panel executive-block"><h3>Action • ข้อเสนอแนะเพื่อเพิ่ม Save</h3><ol>${actions.map(s=>"<li>"+escapeHtml(s)+"</li>").join("")}</ol></article>
+  <details class="panel executive-block executive-secondary"><summary>ข้อมูลประกอบ • Churn Value ${fmtFull(t.churn)} บาท</summary><p>ใช้ประกอบการจัดลำดับเคสที่ควรเร่งติดตาม โดยเน้นผล Save เป็นหลัก</p></details>
+  <p class="executive-method">จำนวนเงิน: บาท • %Save = Revenue Save / Request • pp = จุดเปอร์เซ็นต์ • เกณฑ์ติดตาม 88% • สรุปตามตัวกรองบริการและพื้นที่ด้านบน • ยังไม่รวมสาเหตุ Solution</p>`;
+ $("executiveNote").value=[
+  `เรียนผู้บริหาร | Retention ณ ${fmtDate(m.latest)} | ${scope}`,
+  `รักษารายได้รวม ${(t.save/1e6).toFixed(2)} ล้านบาท • Save Rate ${executivePct(t.rate)} • Save MoM ${executiveMom(t.mom)}`,
+  "By Product: "+m.products.map(r=>`${r.label} Save ${(r.save/1e6).toFixed(2)} ล้านบาท / ${executivePct(r.rate)}`).join(" | "),
+  "By Area Group: "+m.groups.map(r=>r.label+" "+executivePct(r.rate)).join(" • "),
+  "By Shop Type: "+m.types.map(r=>r.label+" "+executivePct(r.rate)).join(" • "),
+  below.length?"พื้นที่เร่งเพิ่ม Save: "+below.map(r=>r.label+" "+executivePct(r.rate)).join(" • "):"ทุกพื้นที่ที่มีข้อมูลผ่านเกณฑ์ Save 88%",
+  m.priority.length?"สาขาติดตาม: "+m.priority.map(r=>r["Shop Name"]+" ("+r.Service+" "+executivePct(n(r["Save Oct"])/n(r["Request Oct"]))+")").join(" • "):"ไม่มีสาขา Save ต่ำกว่า 88% ตามตัวกรอง",
+  ...m.downsell.map(d=>d.available?`Downsell ${d.product} ณ ${fmtDate(d.date)}: ${fmtFull(d.total)} บาท • RR/Budget ${executivePct(d.ratio)}`:`Downsell ${d.product}: ยังไม่มีข้อมูลตามตัวกรอง`),
+  "Action: "+actions.join(" / "),
+  `ข้อมูลรอง: Churn ${fmtFull(t.churn)} บาท`
+ ].join("\n\n");
+}
+async function copyExecutiveNote(){
+ const note=$("executiveNote"),status=$("executiveCopyStatus");
+ try{await navigator.clipboard.writeText(note.value);status.textContent="คัดลอก Note แล้ว";}
+ catch{note.focus();note.select();status.textContent="เลือกข้อความแล้ว กด Ctrl+C หรือคัดลอกข้อความ";}
+}
+
 function render(){
   const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value,data=latestRows(service,group,region),now=aggregatePerformance(data.now),before=aggregatePerformance(data.before);
   renderPeriodLabels(data.prior,data.latest);
@@ -574,7 +660,7 @@ function render(){
   const areaPool=store.performance.filter(row=>row["Report Date"]===data.latest&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)),areas=groupAreas(areaPool);
   bars("saveRateBars",areas,"saveRate",{max:1,sort:"asc",kind:"teal",noteKey:item=>item.saveRate<.88?"ต่ำกว่าเป้าหมาย 88%":"ผ่านเป้าหมาย 88%"});
   bars("runRateBars",areas,"rrCap",{max:Math.max(1.6,...areas.map(item=>item.rrCap)),sort:"desc",kind:"warn",noteKey:item=>item.rrCap>1?`เกิน Cap ${fmtPct(item.rrCap-1)}`:"อยู่ใน Cap"});
-  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();renderPageFocus(service,group,region);
+  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();renderPageFocus(service,group,region);renderExecutiveSummary(service,group,region);
 }
 
 
@@ -630,10 +716,13 @@ function fitTableCapture(mode){
 function closeTableCapture(){const opener=tableCaptureState?.opener;$("tableCaptureDialog").close();tableCaptureState=null;opener?.focus();}
 
 function setPartition(partition){
+  $("executivePartition").hidden=partition!=="executive";
   document.querySelectorAll(".partition-tab").forEach(button=>{const active=button.dataset.partition===partition;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active));});
   $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("downsellTolPartition").hidden=partition!=="downsellTol";$("solutionPartition").hidden=partition!=="solution";
 }
 
+$("executiveCopy").addEventListener("click",copyExecutiveNote);
+$("executiveShortcut").addEventListener("click",()=>{setPartition("executive");$("executivePartition").scrollIntoView({behavior:"smooth",block:"start"});});
 $("serviceFilter").addEventListener("change",render);
 $("areaGroupFilter").addEventListener("change",()=>{populateRegions();render();});
 $("regionFilter").addEventListener("change",render);
