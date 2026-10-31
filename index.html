@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261025-executive">
+  <link rel="stylesheet" href="styles.css?v=20261101-live-solution">
 </head>
 <body>
   <header class="hero">
@@ -349,7 +349,7 @@
             <select id="solutionBranchFilter"><option value="ALL">ทุกสาขา</option></select>
           </label>
           <label>จัดอันดับด้วย
-            <select id="solutionMetricFilter"><option value="cases">Request Sub</option><option value="churn">Churn Value</option><option value="request">Revenue Request</option></select>
+            <select id="solutionMetricFilter"><option value="save">Revenue Save</option><option value="cases">Request Sub</option><option value="churn">Churn Value</option><option value="request">Revenue Request</option></select>
           </label>
         </div>
       </section>
@@ -379,7 +379,7 @@
           <div class="table-scroll solution-branch-scroll" role="region" aria-label="ตาราง Solution รายสาขา" tabindex="0">
             <table class="focus-table capture-table solution-branch-table">
               <caption>Solution อันดับหนึ่งรายสาขา แยกตาม Product</caption>
-              <thead><tr><th scope="col">Product</th><th scope="col">Branch</th><th scope="col">Area</th><th scope="col">Top Solution</th><th scope="col">Request Sub</th><th scope="col">Contribution</th><th scope="col">Rev Request</th><th scope="col">%Save Revenue</th></tr></thead>
+              <thead><tr><th scope="col">Product</th><th scope="col">Branch</th><th scope="col">Area</th><th scope="col">Top Solution</th><th scope="col">Revenue Save</th><th scope="col">Contribution</th><th scope="col">Rev Request</th><th scope="col">%Save Revenue</th></tr></thead>
               <tbody id="solutionBranchTableBody"></tbody>
             </table>
           </div>
@@ -400,7 +400,7 @@
   </dialog>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20261025-executive"></script>
+  <script src="app.js?v=20261101-live-solution"></script>
 </body>
 </html>
 

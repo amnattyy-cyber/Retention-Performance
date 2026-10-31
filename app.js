@@ -11,7 +11,7 @@ const GVIZ_RANGES = {
   Branch_Performance_Daily: "A1:AA2050",
   Downsell_Performance_Daily: "A1:S1200",
   Downsell_TOL_Daily: "A1:S1000",
-  Solution_Performance_Daily: "A1:L5000"
+  Solution_Performance_Daily: "A1:L10000"
 };
 const AREA_GROUPS = {
   "BMA 5 Area": ["BMA I - North West","BMA II - South West","BMA III - North East","BMA IV - South East","BMA V - Central"],
@@ -160,7 +160,7 @@ function latestRows(service,group,region){
   else pool=pool.filter(row=>inScope(row.Region,group,region));
   const dates=[...new Set(pool.map(row=>row["Report Date"]))].sort(),latest=dates.at(-1);
   if(!latest)return {latest:null,prior:null,now:[],before:[]};
-  const priorDate=new Date(latest+"T00:00:00");priorDate.setMonth(priorDate.getMonth()-1);const priorMonth=priorDate.toISOString().slice(0,7);
+  const priorDate=new Date(latest+"T00:00:00");priorDate.setDate(1);priorDate.setMonth(priorDate.getMonth()-1);const priorMonth=priorDate.getFullYear()+"-"+String(priorDate.getMonth()+1).padStart(2,"0");
   const prior=dates.filter(date=>date.slice(0,7)===priorMonth).at(-1)||dates.filter(date=>date<latest).at(-1);
   return {latest,prior,now:pool.filter(row=>row["Report Date"]===latest),before:pool.filter(row=>row["Report Date"]===prior)};
 }
@@ -216,7 +216,7 @@ function comparisonRow(region,july,august){
 
 function areaFocusData(service,group,region){
   const pool=store.performance.filter(row=>row.Region&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region));
-  const dates=[...new Set(pool.map(row=>row["Report Date"]))].sort(),latest=dates.at(-1),prior=dates.at(-2),regions=[...new Set(pool.map(row=>row.Region))].sort();
+  const {latest,prior}=latestRows(service,group,region),regions=[...new Set(pool.map(row=>row.Region))].sort();
   const rows=regions.map(area=>comparisonRow(area,areaSummary(pool.filter(row=>row.Region===area&&row["Report Date"]===prior)),areaSummary(pool.filter(row=>row.Region===area&&row["Report Date"]===latest))));
   const total=comparisonRow("Selection Total",areaSummary(pool.filter(row=>row["Report Date"]===prior)),areaSummary(pool.filter(row=>row["Report Date"]===latest)));
   return {rows,total,latest,prior};
@@ -360,7 +360,8 @@ function renderDownsellTables(group,region){
   $("downsellBranchTableBody").innerHTML=branches.rows.length?branches.rows.map(downsellBranchRowHtml).join(""):'<tr><td colspan="12" class="empty-state">ไม่มีข้อมูล Downsell รายสาขาตามตัวกรอง</td></tr>';
 }
 
-const solutionMetricLabels={cases:"Request Sub",churn:"Churn Value",request:"Revenue Request"};
+const solutionMetricLabels={cases:"Request Sub",churn:"Churn Value",request:"Revenue Request",save:"Revenue Save"};
+const solutionHasCases=rows=>rows.length>0&&rows.every(r=>typeof r["Request Sub"]==="number"&&Number.isFinite(r["Request Sub"]));
 const solutionMetricValue=(item,metric)=>metric==="cases"?item.cases:item[metric];
 const solutionMetricText=(item,metric)=>metric==="cases"?fmtFull(item.cases):fmtMoney(item[metric]);
 const isMissingSolution=value=>!String(value||"").trim()||String(value).trim()==="ไม่ระบุ Solution";
@@ -384,7 +385,7 @@ function aggregateSolutions(rows){
 }
 
 function rankedSolutions(items,metric){
-  return [...items].filter(item=>!isMissingSolution(item.solution)).sort((a,b)=>solutionMetricValue(b,metric)-solutionMetricValue(a,metric)||b.cases-a.cases||a.solution.localeCompare(b.solution,"th"));
+  return [...items].filter(item=>!isMissingSolution(item.solution)&&(item.request||item.save||item.churn||item.cases)).sort((a,b)=>solutionMetricValue(b,metric)-solutionMetricValue(a,metric)||b.cases-a.cases||a.solution.localeCompare(b.solution,"th"));
 }
 
 function solutionProducts(service){return service==="ALL"?["TMH","TOL"]:[service];}
@@ -397,21 +398,22 @@ function populateSolutionBranches(){
 }
 
 function solutionComparisonCard(product,rows,metric){
-  const items=aggregateSolutions(rows),ranked=rankedSolutions(items,metric).slice(0,10),totalCases=items.reduce((total,item)=>total+item.cases,0),totalRequest=items.reduce((total,item)=>total+item.request,0),totalSave=items.reduce((total,item)=>total+item.save,0);
-  const body=ranked.length?ranked.map(item=>`<tr><th scope="row" title="${escapeHtml(item.solution)}">${escapeHtml(item.solution)}</th><td>${fmtFull(item.cases)}</td><td>${fmtFull(item.request)}</td><td>${fmtFull(item.cases?item.request/item.cases:0)}</td><td>${fmtPct(totalRequest?item.request/totalRequest:0)}</td><td>${fmtPct(item.request?item.save/item.request:0)}</td></tr>`).join(""):'<tr><td colspan="6" class="empty-state">ไม่มีข้อมูลในขอบเขตนี้</td></tr>';
-  return `<article class="solution-comparison-card ${product.toLowerCase()}"><div class="solution-comparison-head"><h3>${product}</h3><span>Top 10 by ${solutionMetricLabels[metric]}</span></div><div class="table-scroll solution-comparison-scroll"><table class="solution-comparison-table"><thead><tr><th>SOLUTION NAME</th><th>Request Sub</th><th>Rev Request</th><th>ARPU/Sub</th><th>Contribution</th><th>%Save Revenue</th></tr></thead><tbody>${body}</tbody><tfoot><tr><th>ผลรวม</th><td>${fmtFull(totalCases)}</td><td>${fmtFull(totalRequest)}</td><td>${fmtFull(totalCases?totalRequest/totalCases:0)}</td><td>${fmtPct(totalRequest?1:0)}</td><td>${fmtPct(totalRequest?totalSave/totalRequest:0)}</td></tr></tfoot></table></div></article>`;
+ const items=aggregateSolutions(rows),ranked=rankedSolutions(items,metric).slice(0,10),hasCases=solutionHasCases(rows),totalRequest=sum(rows,"Rev Request"),totalSave=sum(rows,"Rev Save"),totalChurn=sum(rows,"Churn Value"),totalCases=sum(rows,"Request Sub");
+ const cells=item=>`${hasCases?"<td>"+fmtFull(item.cases)+"</td>":""}<td>${fmtFull(item.request)}</td><td class="customer-rate">${fmtFull(item.save)}</td><td>${fmtPct(item.request?item.save/item.request:0)}</td><td>${fmtPct(totalRequest?item.request/totalRequest:0)}</td><td>${fmtFull(item.churn)}</td>`;
+ return `<article class="solution-comparison-card ${product.toLowerCase()}"><div class="solution-comparison-head"><h3>${product}</h3><span>Top 10 by ${solutionMetricLabels[metric]}</span></div><div class="table-scroll solution-comparison-scroll"><table class="solution-comparison-table"><thead><tr><th>SOLUTION NAME</th>${hasCases?"<th>Request Sub</th>":""}<th>Rev Request</th><th>Rev Save</th><th>%Save Revenue</th><th>สัดส่วน Request</th><th>Churn Value</th></tr></thead><tbody>${ranked.length?ranked.map(item=>"<tr><th scope='row'>"+escapeHtml(item.solution)+"</th>"+cells(item)+"</tr>").join(""):`<tr><td colspan="${hasCases?7:6}">ไม่มีข้อมูลตามตัวกรอง</td></tr>`}</tbody><tfoot><tr><th>ผลรวมทุกสาเหตุ</th>${cells({cases:totalCases,request:totalRequest,save:totalSave,churn:totalChurn})}</tr></tfoot></table></div></article>`;
 }
 
 function renderSolutionLeaders(products,group,region,branch,metric){
   $("solutionLeaders").innerHTML=products.map(product=>{
     const rows=solutionScopeRows(product,group,region,branch),items=aggregateSolutions(rows),top=rankedSolutions(items,metric)[0],validCases=items.filter(item=>!isMissingSolution(item.solution)).reduce((total,item)=>total+item.cases,0);
     if(!top)return `<article class="solution-leader-card ${product.toLowerCase()}"><div class="solution-leader-head"><span>${product}</span><small>ไม่มีข้อมูล</small></div></article>`;
-    return `<article class="solution-leader-card ${product.toLowerCase()}"><div class="solution-leader-head"><span>${product}</span><small>อันดับ 1 • ${solutionMetricLabels[metric]}</small></div><h3>${escapeHtml(top.solution)}</h3><div class="solution-leader-metrics"><div><small>Request Sub</small><strong>${fmtFull(top.cases)}</strong></div><div><small>สัดส่วนเคส</small><strong>${fmtPct(validCases?top.cases/validCases:0)}</strong></div><div><small>Churn Value</small><strong>${fmtMoney(top.churn)}</strong></div></div></article>`;
+    return `<article class="solution-leader-card ${product.toLowerCase()}"><div class="solution-leader-head"><span>${product}</span><small>อันดับ 1 • ${solutionMetricLabels[metric]}</small></div><h3>${escapeHtml(top.solution)}</h3><div class="solution-leader-metrics"><div><small>Revenue Save</small><strong>${fmtMoney(top.save)}</strong></div><div><small>%Save Revenue</small><strong>${top.request?fmtPct(top.save/top.request):"—"}</strong></div><div><small>Revenue Request</small><strong>${fmtMoney(top.request)}</strong></div></div></article>`;
   }).join("");
 }
 
 function renderSolutionMatrices(products,group,region,metric,branch){
   const areas=(group==="ALL"?Object.values(AREA_GROUPS).flat():AREA_GROUPS[group]||[]).filter(area=>region==="ALL"||area===region);
+  if(group==="ALL"&&region==="ALL"&&latestSolutionRows().rows.some(r=>r.Region==="ไม่ระบุพื้นที่"))areas.push("ไม่ระบุพื้นที่");
   $("solutionAreaMatrices").innerHTML=products.map(product=>{
     const body=areas.map(area=>{
       const top=rankedSolutions(aggregateSolutions(solutionScopeRows(product,group,area,branch)),metric).slice(0,10);
@@ -419,7 +421,7 @@ function renderSolutionMatrices(products,group,region,metric,branch){
     }).join("")||'<tr><td colspan="11" class="empty-state">ไม่มีข้อมูลในขอบเขตนี้</td></tr>';
     return `<article class="solution-matrix-card ${product.toLowerCase()}"><div class="solution-matrix-head"><h3>${product}</h3><span>${areas.length} Areas • Top 10 by ${solutionMetricLabels[metric]}</span></div><div class="table-scroll solution-matrix-scroll"><table class="solution-matrix"><thead><tr><th>AREA</th>${Array.from({length:10},(_,index)=>`<th>#${index+1}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div></article>`;
   }).join("");
-  document.querySelectorAll("[data-solution-area]").forEach(row=>row.addEventListener("click",()=>{$("regionFilter").value=row.dataset.solutionArea;populateSolutionBranches();render();document.querySelector(".solution-branch-card").scrollIntoView({behavior:"smooth",block:"start"});}));
+  document.querySelectorAll("[data-solution-area]").forEach(row=>row.addEventListener("click",()=>{$("regionFilter").value=Object.values(AREA_GROUPS).flat().includes(row.dataset.solutionArea)?row.dataset.solutionArea:"ALL";populateSolutionBranches();render();document.querySelector(".solution-branch-card").scrollIntoView({behavior:"smooth",block:"start"});}));
 }
 
 function renderSolutionBranches(products,group,region,metric){
@@ -427,15 +429,18 @@ function renderSolutionBranches(products,group,region,metric){
   rows.filter(row=>products.includes(row.Product)&&row["Shop Name"]).forEach(row=>{const key=`${row.Product}|${row.Region}|${row["Shop Name"]}`,items=grouped.get(key)||[];items.push(row);grouped.set(key,items);});
   const branches=[...grouped.values()].map(items=>{const product=items[0].Product,area=items[0].Region,branch=items[0]["Shop Name"],solutions=aggregateSolutions(items),top=rankedSolutions(solutions,metric)[0],totalRequest=solutions.reduce((total,item)=>total+item.request,0);return {product,area,branch,top,totalRequest};}).filter(item=>item.top).sort((a,b)=>a.area.localeCompare(b.area)||a.product.localeCompare(b.product)||solutionMetricValue(b.top,metric)-solutionMetricValue(a.top,metric)||a.branch.localeCompare(b.branch,"th"));
   $("solutionBranchScope").textContent=scopeLabel(group,region);$("solutionBranchCount").textContent=`${branches.length} Branches`;
-  $("solutionBranchTableBody").innerHTML=branches.length?branches.map(item=>`<tr data-solution-branch="${escapeHtml(item.branch)}" data-solution-area="${escapeHtml(item.area)}"><td><span class="service-pill ${item.product.toLowerCase()}">${item.product}</span></td><th scope="row">${escapeHtml(item.branch)}</th><td>${escapeHtml(item.area)}</td><td>${escapeHtml(item.top.solution)}</td><td>${fmtFull(item.top.cases)}</td><td>${fmtPct(item.totalRequest?item.top.request/item.totalRequest:0)}</td><td>${fmtFull(item.top.request)}</td><td>${fmtPct(item.top.request?item.top.save/item.top.request:0)}</td></tr>`).join(""):'<tr><td colspan="8" class="empty-state">ไม่มีข้อมูลรายสาขาตามตัวกรอง</td></tr>';
-  document.querySelectorAll("[data-solution-branch]").forEach(row=>row.addEventListener("click",()=>{$("regionFilter").value=row.dataset.solutionArea;populateSolutionBranches();$("solutionBranchFilter").value=row.dataset.solutionBranch;renderSolutions();document.querySelector("#solutionPartition section:nth-child(2)").scrollIntoView({behavior:"smooth",block:"start"});}));
+  $("solutionBranchTableBody").innerHTML=branches.length?branches.map(item=>`<tr data-solution-branch="${escapeHtml(item.branch)}" data-solution-area="${escapeHtml(item.area)}"><td><span class="service-pill ${item.product.toLowerCase()}">${item.product}</span></td><th scope="row">${escapeHtml(item.branch)}</th><td>${escapeHtml(item.area)}</td><td>${escapeHtml(item.top.solution)}</td><td>${fmtFull(item.top.save)}</td><td>${fmtPct(item.totalRequest?item.top.request/item.totalRequest:0)}</td><td>${fmtFull(item.top.request)}</td><td>${fmtPct(item.top.request?item.top.save/item.top.request:0)}</td></tr>`).join(""):'<tr><td colspan="8" class="empty-state">ไม่มีข้อมูลรายสาขาตามตัวกรอง</td></tr>';
+  document.querySelectorAll("[data-solution-branch]").forEach(row=>row.addEventListener("click",()=>{$("regionFilter").value=Object.values(AREA_GROUPS).flat().includes(row.dataset.solutionArea)?row.dataset.solutionArea:"ALL";populateSolutionBranches();$("solutionBranchFilter").value=row.dataset.solutionBranch;renderSolutions();document.querySelector("#solutionPartition section:nth-child(2)").scrollIntoView({behavior:"smooth",block:"start"});}));
 }
 
 function renderSolutions(){
+  const caseOption=$("solutionMetricFilter").querySelector('option[value="cases"]');
+  caseOption.disabled=!solutionHasCases(latestSolutionRows().rows);
+  if(caseOption.disabled&&$("solutionMetricFilter").value==="cases")$("solutionMetricFilter").value="save";
   populateSolutionBranches();
   renderSolutionFocus();
   const service=$("serviceFilter").value,products=solutionProducts(service),group=$("areaGroupFilter").value,region=$("regionFilter").value,branch=$("solutionBranchFilter").value,metric=$("solutionMetricFilter").value,{latest}=latestSolutionRows(),scope=[scopeLabel(group,region),branch!=="ALL"?branch:null].filter(Boolean).join(" • ");
-  $("solutionDataNotice").textContent=store.solutionLive?`ข้อมูล ณ ${fmtDate(latest)} • ไฟล์ 12 Oct ไม่มีจำนวน Request Sub จึงยังใช้ข้อมูลชุดเดิม`:(store.solutions.length?`ข้อมูล ณ ${fmtDate(latest)} • ใช้ Snapshot สำรอง`:"ไม่สามารถโหลดข้อมูล Solution ได้ กรุณาตรวจสิทธิ์ Google Sheet");
+  $("solutionDataNotice").textContent=store.solutionLive?`ข้อมูล ณ ${fmtDate(latest)} • เชื่อมข้อมูลต้นทางอัตโนมัติ${solutionHasCases(latestSolutionRows().rows)?"":" • ต้นทางไม่มี Request Sub / ARPU จึงแสดงเฉพาะรายได้"} • ${latestSolutionRows().rows.filter(r=>r.Region==="ไม่ระบุพื้นที่").length} รายการยังไม่พบพื้นที่ในทะเบียนสาขา (รวมใน ALL)`:(store.solutions.length?`ข้อมูล ณ ${fmtDate(latest)} • ใช้ Snapshot สำรอง`:"ไม่สามารถโหลดข้อมูล Solution ได้ กรุณาตรวจสิทธิ์ Google Sheet");
   $("solutionLeaderScope").textContent=scope;$("solutionComparisonScope").textContent=scope;
   renderSolutionLeaders(products,group,region,branch,metric);
   $("solutionComparisonTables").innerHTML=products.map(product=>solutionComparisonCard(product,solutionScopeRows(product,group,region,branch),metric)).join("");
