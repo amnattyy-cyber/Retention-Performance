@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261105-downsell-mom">
+  <link rel="stylesheet" href="styles.css?v=20261105-month-archive">
 </head>
 <body>
   <header class="hero">
@@ -34,6 +34,11 @@
   </header>
 
   <main class="shell dashboard">
+    <section class="panel" style="padding:18px 22px;margin-bottom:18px" aria-label="เลือกเดือนรายงาน">
+      <strong>เดือนรายงาน</strong>
+      <nav id="monthTabs" class="partition-tabs" aria-label="เลือกเดือน"><button type="button" class="partition-tab is-active" data-month="live">เดือนล่าสุด</button></nav>
+      <div id="monthNote" role="status" aria-live="polite" style="font-size:14px;line-height:1.7;color:#536480">กำลังตรวจสอบเดือนที่มีข้อมูล...</div>
+    </section>
     <section class="control-bar" aria-label="ตัวกรองข้อมูล">
       <div class="control-heading">
         <span class="control-icon">⌁</span>
@@ -400,7 +405,7 @@
   </dialog>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20261105-downsell-mom"></script>
+  <script src="app.js?v=20261105-month-archive"></script>
 </body>
 </html>
 

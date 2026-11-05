@@ -113,6 +113,46 @@ function solutionFallbackRows(){
   })))));
 }
 
+
+let liveMonthlyStore=null;
+let liveMonthlyStatus=null;
+let selectedReportMonth="live";
+let monthSelectionVersion=0;
+let octoberSnapshotPromise=null;
+const MONTH_ARCHIVES={"2026-10":{label:"October 2026",url:"archives/2026-10.json",note:"ข้อมูลย้อนหลังที่บันทึกไว้ • Retention / Downsell TOL / Solution ณ 30 Oct 2026 • Downsell TMH ณ 29 Oct 2026 • ยังไม่ใช่ยอดปิดเดือน 31 Oct"}};
+function snapshotStore(data){
+  return {performance:rowObjects(data.performance,PERF_HEADERS),branches:rowObjects(data.branches,BRANCH_HEADERS),
+    downsell:rowObjects(data.tmh.filter(row=>row[1]==="AREA").map(row=>[row[0],row[3],row[6],row[7],row[8],row[9],row[17],row[18],row[10],row[11],row[12],row[13],row[14],row[15]]),DOWN_HEADERS),downsellDetails:rowObjects(data.tmh,DOWNSELL_DETAIL_HEADERS),
+    tolDownsellDetails:rowObjects(data.tol,DOWNSELL_DETAIL_HEADERS).filter(validDownsellRow),
+    solutions:rowObjects(data.solutions,SOLUTION_HEADERS),live:true,branchLive:true,
+    downsellDetailLive:true,tolDownsellDetailLive:true,solutionLive:true};
+}
+function renderMonthControls(){
+  const latest=liveMonthlyStore?.performance.map(row=>row["Report Date"]).sort().at(-1);
+  const liveLabel=latest?new Date(latest+"T00:00:00").toLocaleDateString("en-US",{month:"long",year:"numeric"}):"เดือนล่าสุด";
+  $("monthTabs").innerHTML=Object.entries(MONTH_ARCHIVES).map(([key,item])=>'<button type="button" class="partition-tab '+(selectedReportMonth===key?'is-active':'')+'" data-month="'+key+'" aria-pressed="'+(selectedReportMonth===key)+'">'+item.label+'</button>').join("")+
+    '<button type="button" class="partition-tab '+(selectedReportMonth==="live"?'is-active':'')+'" data-month="live" aria-pressed="'+(selectedReportMonth==="live")+'">'+liveLabel+' • ล่าสุด</button>';
+  $("monthNote").textContent=selectedReportMonth==="live"?"เดือนล่าสุด • อัปเดตจาก Google Sheet ทุก 5 นาทีเมื่อเปิดหน้านี้":MONTH_ARCHIVES[selectedReportMonth].note;
+}
+async function selectReportMonth(month){
+  const version=++monthSelectionVersion;
+  try{
+    let next=liveMonthlyStore;
+    if(month!=="live"){
+      const archive=MONTH_ARCHIVES[month];if(!archive)return;
+      $("monthNote").textContent="กำลังโหลดข้อมูลย้อนหลัง...";
+      if(!octoberSnapshotPromise)octoberSnapshotPromise=fetch(archive.url).then(response=>{if(!response.ok)throw new Error("Archive unavailable");return response.json();}).catch(error=>{octoberSnapshotPromise=null;throw error;});
+      next=snapshotStore(await octoberSnapshotPromise);
+    }
+    if(version!==monthSelectionVersion||!next)return;
+    selectedReportMonth=month;store=next;
+    $("solutionBranchFilter").value="ALL";
+    renderMonthControls();populateRegions();render();
+    if(month==="live"&&liveMonthlyStatus){$("dataStatus").className=liveMonthlyStatus.className;$("dataStatus").innerHTML=liveMonthlyStatus.html;}
+    if(month!=="live"){$("dataStatus").className="status-pill";$("dataStatus").innerHTML="<span></span>October • ข้อมูลย้อนหลังที่บันทึกไว้";}
+  }catch(error){if(version===monthSelectionVersion){renderMonthControls();$("monthNote").textContent="โหลดข้อมูลย้อนหลังไม่สำเร็จ กรุณาลองเลือกเดือนอีกครั้ง";}}
+}
+
 async function loadData(){
   const status=$("dataStatus");
   status.className="status-pill";
@@ -137,7 +177,9 @@ async function loadData(){
   if(coreLive&&store.branchLive&&store.downsellDetailLive&&store.tolDownsellDetailLive&&store.solutionLive){status.className="status-pill live";status.innerHTML="<span></span>Live from Google Sheet";}
   else if(coreLive){status.className="status-pill fallback";status.innerHTML="<span></span>Live • บางตารางใช้ข้อมูลสำรอง";}
   else{status.className="status-pill fallback";status.innerHTML="<span></span>Snapshot • รอสิทธิ์ Google Sheet";}
-  populateRegions();render();
+  liveMonthlyStore=store;
+  liveMonthlyStatus={className:status.className,html:status.innerHTML};
+  await selectReportMonth(selectedReportMonth);
 }
 
 function populateRegions(){
@@ -732,6 +774,7 @@ function setPartition(partition){
   $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("downsellTolPartition").hidden=partition!=="downsellTol";$("solutionPartition").hidden=partition!=="solution";
 }
 
+$("monthTabs").addEventListener("click",event=>{const button=event.target.closest("[data-month]");if(button)selectReportMonth(button.dataset.month);});
 $("executiveCopy").addEventListener("click",copyExecutiveNote);
 $("executiveShortcut").addEventListener("click",()=>{setPartition("executive");$("executivePartition").scrollIntoView({behavior:"smooth",block:"start"});});
 $("serviceFilter").addEventListener("change",render);
