@@ -706,8 +706,8 @@ async function copyExecutiveNote(){
 // Churn Cap uses the budgets and components published in Retention Focus Tier.
 const capNumber=value=>typeof value==="number"&&Number.isFinite(value)?value:null;
 const capRatio=(value,budget)=>value!==null&&budget!==null&&budget>0?value/budget:null;
-const capMoney=value=>value===null?"�":"�"+fmtFull(value);
-const capPercent=value=>value===null?"�":fmtPct(value);
+const capMoney=value=>value===null?"—":"฿"+fmtFull(value);
+const capPercent=value=>value===null?"—":fmtPct(value);
 function capProject(value,row){
  const day=capNumber(row?.["Cutoff Day"]),days=capNumber(row?.["Days in Month"]);
  return value!==null&&day>0&&days>=day?value/day*days:null;
@@ -756,10 +756,10 @@ function capAggregate(rows){
  }
  return capFinish(result);
 }
-const capStatusLabels={safe:"����� Cap",near:"��� Cap",over:"�Թ Cap",unknown:"���������ú / ����� Budget"};
+const capStatusLabels={safe:"อยู่ใน Cap",near:"ใกล้ Cap",over:"เกิน Cap",unknown:"ข้อมูลไม่ครบ / ไม่มี Budget"};
 function capBadge(row){return '<span class="cap-badge '+row.status+'">'+capStatusLabels[row.status]+'</span>';}
 function capTable(rows,branch){
- const headers=["Product",branch?"�Ң�":"Area",...(branch?["Area","Type Shop"]:[]),"Budget Churn","Churn MTD","RR Churn","RR Churn / Budget","Budget Downsell","Downsell MTD","RR Downsell","Budget ���","Out Flow MTD","RR Out Flow","RR %Churn Cap","RR �Թ / ��ӡ��� Budget","ʶҹ�"];
+ const headers=["Product",branch?"สาขา":"Area",...(branch?["Area","Type Shop"]:[]),"Budget Churn","Churn MTD","RR Churn","RR Churn / Budget","Budget Downsell","Downsell MTD","RR Downsell","Budget รวม","Out Flow MTD","RR Out Flow","RR %Churn Cap","RR เกิน / ต่ำกว่า Budget","สถานะ"];
  const money=value=>"<td>"+capMoney(value)+"</td>";
  const body=rows.map(r=>'<tr><td>'+escapeHtml(r.product)+'</td><th scope="row">'+escapeHtml(branch?r.name:r.area)+'</th>'+
  (branch?'<td>'+escapeHtml(r.area)+'</td><td>'+escapeHtml(r.type)+'</td>':"")+
@@ -767,33 +767,33 @@ function capTable(rows,branch){
  money(r.downBudget)+money(r.down)+money(r.downRR)+money(r.budget)+money(r.mtd)+money(r.rr)+
  '<td class="'+(r.status==="over"?"bad":r.status==="safe"?"good":"")+'">'+capPercent(r.rrRatio)+'</td>'+money(r.gap)+'<td>'+capBadge(r)+'</td></tr>').join("");
  return '<table class="cap-table"><thead><tr>'+headers.map(h=>'<th scope="col">'+h+'</th>').join("")+'</tr></thead><tbody>'+
- (body||'<tr><td colspan="'+headers.length+'" class="empty-state">����բ����ŵ����ǡ�ͧ</td></tr>')+'</tbody></table>';
+ (body||'<tr><td colspan="'+headers.length+'" class="empty-state">ไม่มีข้อมูลตามตัวกรอง</td></tr>')+'</tbody></table>';
 }
 function capBudgetBar(label,mtd,rr,budget){
  const m=capRatio(mtd,budget),r=capRatio(rr,budget),scale=Math.max(1.2,m||0,r||0);
  return '<article class="cap-budget-row"><div><strong>'+label+'</strong><span>Budget '+capMoney(budget)+'</span></div>'+
- '<p>MTD <b>'+capMoney(mtd)+'</b> ('+capPercent(m)+') ? RR <b>'+capMoney(rr)+'</b> ('+capPercent(r)+')</p>'+
+ '<p>MTD <b>'+capMoney(mtd)+'</b> ('+capPercent(m)+') · RR <b>'+capMoney(rr)+'</b> ('+capPercent(r)+')</p>'+
  '<div class="cap-track" aria-hidden="true"><i class="cap-rr" style="width:'+((r||0)/scale*100)+'%"></i><i class="cap-mtd" style="width:'+((m||0)/scale*100)+'%"></i><i class="cap-limit" style="left:'+(100/scale)+'%"></i></div></article>';
 }
 function renderChurnCap(){
  const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value;
  const model=capBranchModel(service,group,region),typeSelect=$("capType"),old=typeSelect.value;
  const types=[...new Set(model.rows.map(r=>r.type).filter(Boolean))].sort();
- typeSelect.innerHTML='<option value="ALL">�ء Type Shop</option>'+types.map(t=>'<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>').join("");
+ typeSelect.innerHTML='<option value="ALL">ทุก Type Shop</option>'+types.map(t=>'<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>').join("");
  typeSelect.value=types.includes(old)?old:"ALL";
  const query=$("capSearch").value.trim().toLowerCase(),status=$("capStatus").value;
  const scoped=model.rows.filter(r=>(typeSelect.value==="ALL"||r.type===typeSelect.value)&&(!query||r.name.toLowerCase().includes(query)));
  const rows=scoped.filter(r=>status==="ALL"||r.status===status),total=capAggregate(rows);
- $("capScope").textContent=scopeLabel(group,region)+" � "+rows.length+" ��¡���Ң�/Product � "+model.periods.map(p=>p.product+": Churn "+fmtDate(p.churnDate)+" / Downsell "+fmtDate(p.downDate)).join(" � ");
- $("capAvailability").textContent="Budget �ҡ Retention Focus Tier �����͹������͡ � Out Flow = Churn Value + Downsell Retention + Downsell Aftersale �����§ҹ���� � �ѧ����բ������׹�ѹ Churn DTAC ��� Share Plan �¡ �֧���ǡ������� � RR �ӹǳ�¡����ѹ�����Ţͧ����ͧ���Сͺ ���Ǩ֧���"+(model.periods.some(p=>!p.sameMonth)?" � �ժش���������ú��͹���ǡѹ �֧����ʴ� Cap ������¡�ù��":"");
+ $("capScope").textContent=scopeLabel(group,region)+" • "+rows.length+" รายการสาขา/Product • "+model.periods.map(p=>p.product+": Churn "+fmtDate(p.churnDate)+" / Downsell "+fmtDate(p.downDate)).join(" • ");
+ $("capAvailability").textContent="Budget จาก Retention Focus Tier ตามเดือนที่เลือก • Out Flow = Churn Value + Downsell Retention + Downsell Aftersale ที่รายงานในไฟล์ • ยังไม่มีข้อมูลยืนยัน Churn DTAC และ Share Plan แยก จึงไม่บวกเพิ่มเติม • RR คำนวณแยกตามวันข้อมูลของแต่ละองค์ประกอบ แล้วจึงรวม"+(model.periods.some(p=>!p.sameMonth)?" • มีชุดข้อมูลไม่ครบเดือนเดียวกัน จึงไม่แสดง Cap รวมในรายการนั้น":"");
  const card=(label,value,note)=>'<article class="customer-metric"><small>'+label+'</small><strong>'+value+'</strong><span>'+note+'</span></article>';
- $("capCards").innerHTML=card("BUDGET OUT FLOW",capMoney(total.budget),"Budget Churn + Budget Downsell �����͹")+
- card("OUT FLOW MTD",capMoney(total.mtd),"��������ѹ�����������Ъش")+
- card("%CHURN CAP MTD",capPercent(total.mtdRatio),"Out Flow MTD ? Budget �����͹")+
+ $("capCards").innerHTML=card("BUDGET OUT FLOW",capMoney(total.budget),"Budget Churn + Budget Downsell ทั้งเดือน")+
+ card("OUT FLOW MTD",capMoney(total.mtd),"สะสมตามวันที่ข้อมูลแต่ละชุด")+
+ card("%CHURN CAP MTD",capPercent(total.mtdRatio),"Out Flow MTD ÷ Budget ทั้งเดือน")+
  card("RR %CHURN CAP",capPercent(total.rrRatio),"RR Out Flow "+capMoney(total.rr))+
- card("BUDGET �������",capMoney(total.remaining),"Budget �����͹ ? Out Flow MTD");
- $("capBudgetBars").innerHTML=capBudgetBar("Churn",total.churn,total.churnRR,total.churnBudget)+capBudgetBar("Downsell",total.down,total.downRR,total.downBudget)+capBudgetBar("Out Flow ���",total.mtd,total.rr,total.budget);
- $("capComponents").innerHTML='<dl>'+[["Churn Value",total.churn],["Downsell Retention",total.retention],["Downsell Aftersale",total.aftersale],["Out Flow ���",total.mtd]].map(([label,value])=>'<div><dt>'+label+'</dt><dd>'+capMoney(value)+'</dd></div>').join("")+'</dl>';
+ card("BUDGET คงเหลือ",capMoney(total.remaining),"Budget ทั้งเดือน − Out Flow MTD");
+ $("capBudgetBars").innerHTML=capBudgetBar("Churn",total.churn,total.churnRR,total.churnBudget)+capBudgetBar("Downsell",total.down,total.downRR,total.downBudget)+capBudgetBar("Out Flow รวม",total.mtd,total.rr,total.budget);
+ $("capComponents").innerHTML='<dl>'+[["Churn Value",total.churn],["Downsell Retention",total.retention],["Downsell Aftersale",total.aftersale],["Out Flow รวม",total.mtd]].map(([label,value])=>'<div><dt>'+label+'</dt><dd>'+capMoney(value)+'</dd></div>').join("")+'</dl>';
  const areas=new Map();rows.forEach(r=>{const key=r.product+"|"+r.area;if(!areas.has(key))areas.set(key,[]);areas.get(key).push(r);});
  const areaRows=[...areas.values()].map(items=>({...capAggregate(items),product:items[0].product,area:items[0].area}));
  const rank=(a,b)=>(b.rrRatio??-1)-(a.rrRatio??-1);
@@ -801,14 +801,13 @@ function renderChurnCap(){
  $("capAreaTable").innerHTML=capTable(areaRows,false);$("capBranchTable").innerHTML=capTable(rows,true);
  const over=rows.filter(r=>r.status==="over"),near=rows.filter(r=>r.status==="near"),unknown=rows.filter(r=>r.status==="unknown");
  const findings=[];
- findings.push('�Թ Cap <strong>'+over.length+'</strong> ��¡�� � ��� Cap (90�100%) <strong>'+near.length+'</strong> ��¡�� � ���������ú/����� Budget <strong>'+unknown.length+'</strong> ��¡��');
- if(total.gap!==null)findings.push('�Ҵ��ó� Out Flow �����͹ <strong>'+capMoney(total.rr)+'</strong> ��º Budget '+capMoney(total.budget)+' � '+(total.gap>0?'�Թ':'��ӡ���')+' Budget <strong>'+capMoney(Math.abs(total.gap))+'</strong>');
+ findings.push('เกิน Cap <strong>'+over.length+'</strong> รายการ • ใกล้ Cap (90–100%) <strong>'+near.length+'</strong> รายการ • ข้อมูลไม่ครบ/ไม่มี Budget <strong>'+unknown.length+'</strong> รายการ');
+ if(total.gap!==null)findings.push('คาดการณ์ Out Flow สิ้นเดือน <strong>'+capMoney(total.rr)+'</strong> เทียบ Budget '+capMoney(total.budget)+' — '+(total.gap>0?'เกิน':'ต่ำกว่า')+' Budget <strong>'+capMoney(Math.abs(total.gap))+'</strong>');
  const highest=[...over].sort((a,b)=>(b.gap||0)-(a.gap||0)).slice(0,3);
- if(highest.length)findings.push('�Ңҷ���õԴ�����͹ (��Ť�ҤҴ��ó��Թ Budget �٧�ش): '+highest.map(r=>escapeHtml(r.name)+' ('+r.product+') <strong>'+capMoney(r.gap)+'</strong>').join(' � '));
- if(total.churnRR!==null&&total.downRR!==null)findings.push('ͧ���Сͺ RR ����٧����: <strong>'+(total.churnRR>=total.downRR?'Churn':'Downsell')+'</strong> � ��Ǩ���˵��˹�� Solution ��еԴ���������Ң�');
+ if(highest.length)findings.push('สาขาที่ควรติดตามก่อน (มูลค่าคาดการณ์เกิน Budget สูงสุด): '+highest.map(r=>escapeHtml(r.name)+' ('+r.product+') <strong>'+capMoney(r.gap)+'</strong>').join(' • '));
+ if(total.churnRR!==null&&total.downRR!==null)findings.push('องค์ประกอบ RR ที่สูงกว่า: <strong>'+(total.churnRR>=total.downRR?'Churn':'Downsell')+'</strong> • ตรวจสาเหตุในหน้า Solution และติดตามผลรายสาขา');
  $("capFindings").innerHTML=findings.map(t=>'<li>'+t+'</li>').join("");
 }
-
 
 function render(){
   const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value,data=latestRows(service,group,region),now=aggregatePerformance(data.now),before=aggregatePerformance(data.before);
