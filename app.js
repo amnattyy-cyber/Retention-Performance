@@ -703,6 +703,113 @@ async function copyExecutiveNote(){
  catch{note.focus();note.select();status.textContent="เลือกข้อความแล้ว กด Ctrl+C หรือคัดลอกข้อความ";}
 }
 
+// Churn Cap uses the budgets and components published in Retention Focus Tier.
+const capNumber=value=>typeof value==="number"&&Number.isFinite(value)?value:null;
+const capRatio=(value,budget)=>value!==null&&budget!==null&&budget>0?value/budget:null;
+const capMoney=value=>value===null?"�":"�"+fmtFull(value);
+const capPercent=value=>value===null?"�":fmtPct(value);
+function capProject(value,row){
+ const day=capNumber(row?.["Cutoff Day"]),days=capNumber(row?.["Days in Month"]);
+ return value!==null&&day>0&&days>=day?value/day*days:null;
+}
+function capFinish(item){
+ item.budget=item.churnBudget!==null&&item.downBudget!==null?item.churnBudget+item.downBudget:null;
+ item.mtd=item.churn!==null&&item.down!==null?item.churn+item.down:null;
+ item.rr=item.churnRR!==null&&item.downRR!==null?item.churnRR+item.downRR:null;
+ item.mtdRatio=capRatio(item.mtd,item.budget);item.rrRatio=capRatio(item.rr,item.budget);
+ item.remaining=item.budget!==null&&item.mtd!==null?item.budget-item.mtd:null;
+ item.gap=item.budget!==null&&item.rr!==null?item.rr-item.budget:null;
+ item.status=item.rrRatio===null?"unknown":item.rrRatio>1?"over":item.rrRatio>=.9?"near":"safe";
+ return item;
+}
+function capBranchModel(service,group,region){
+ const output=[],periods=[];
+ for(const product of solutionProducts(service)){
+  const allChurn=store.branches.filter(r=>r.Service===product);
+  const churnDate=allChurn.map(r=>r["Report Date"]).sort().at(-1);
+  const allDown=(product==="TMH"?store.downsellDetails:store.tolDownsellDetails||[]).filter(r=>String(r.Level).toUpperCase()==="BRANCH");
+  const downDate=allDown.map(r=>r["Report Date"]).sort().at(-1);
+  const sameMonth=churnDate&&downDate&&churnDate.slice(0,7)===downDate.slice(0,7);
+  periods.push({product,churnDate,downDate,sameMonth});
+  const rows=new Map(),key=r=>r.Region+"|"+String(r["Shop Name"]||"").trim().replace(/\s+/g," ").toLowerCase();
+  for(const r of allChurn.filter(r=>r["Report Date"]===churnDate&&inScope(r.Region,group,region))){
+   if(r["Shop Name"])rows.set(key(r),{c:r,d:null});
+  }
+  if(sameMonth)for(const r of allDown.filter(r=>r["Report Date"]===downDate&&inScope(r.Region,group,region))){
+   if(!r["Shop Name"])continue;
+   const pair=rows.get(key(r))||{c:null,d:null};pair.d=r;rows.set(key(r),pair);
+  }
+  for(const {c,d} of rows.values()){
+   const base=c||d,churn=capNumber(c?.["Churn Oct"]),down=capNumber(d?.["Total Downsell"]);
+   const churnBudget=capNumber(c?.["Budget Churn"]),downBudget=capNumber(d?.["Budget Downsell"]);
+   if(![churn,down,churnBudget,downBudget].some(v=>v!==null&&v!==0))continue;
+   output.push(capFinish({product,area:base.Region,name:base["Shop Name"],type:normalizeShopType(base["Shop Type"]),churn,down,churnBudget,downBudget,
+    churnRR:capProject(churn,c),downRR:capProject(down,d),retention:capNumber(d?.["Downsell Retention"]),aftersale:capNumber(d?.["Downsell Aftersale"])}));
+  }
+ }
+ return {rows:output,periods};
+}
+function capAggregate(rows){
+ const result={count:rows.length};
+ for(const field of ["churn","down","churnBudget","downBudget","churnRR","downRR","retention","aftersale"]){
+  result[field]=rows.length&&rows.every(r=>r[field]!==null)?rows.reduce((s,r)=>s+r[field],0):null;
+ }
+ return capFinish(result);
+}
+const capStatusLabels={safe:"����� Cap",near:"��� Cap",over:"�Թ Cap",unknown:"���������ú / ����� Budget"};
+function capBadge(row){return '<span class="cap-badge '+row.status+'">'+capStatusLabels[row.status]+'</span>';}
+function capTable(rows,branch){
+ const headers=["Product",branch?"�Ң�":"Area",...(branch?["Area","Type Shop"]:[]),"Budget Churn","Churn MTD","RR Churn","RR Churn / Budget","Budget Downsell","Downsell MTD","RR Downsell","Budget ���","Out Flow MTD","RR Out Flow","RR %Churn Cap","RR �Թ / ��ӡ��� Budget","ʶҹ�"];
+ const money=value=>"<td>"+capMoney(value)+"</td>";
+ const body=rows.map(r=>'<tr><td>'+escapeHtml(r.product)+'</td><th scope="row">'+escapeHtml(branch?r.name:r.area)+'</th>'+
+ (branch?'<td>'+escapeHtml(r.area)+'</td><td>'+escapeHtml(r.type)+'</td>':"")+
+ money(r.churnBudget)+money(r.churn)+money(r.churnRR)+'<td>'+capPercent(capRatio(r.churnRR,r.churnBudget))+'</td>'+
+ money(r.downBudget)+money(r.down)+money(r.downRR)+money(r.budget)+money(r.mtd)+money(r.rr)+
+ '<td class="'+(r.status==="over"?"bad":r.status==="safe"?"good":"")+'">'+capPercent(r.rrRatio)+'</td>'+money(r.gap)+'<td>'+capBadge(r)+'</td></tr>').join("");
+ return '<table class="cap-table"><thead><tr>'+headers.map(h=>'<th scope="col">'+h+'</th>').join("")+'</tr></thead><tbody>'+
+ (body||'<tr><td colspan="'+headers.length+'" class="empty-state">����բ����ŵ����ǡ�ͧ</td></tr>')+'</tbody></table>';
+}
+function capBudgetBar(label,mtd,rr,budget){
+ const m=capRatio(mtd,budget),r=capRatio(rr,budget),scale=Math.max(1.2,m||0,r||0);
+ return '<article class="cap-budget-row"><div><strong>'+label+'</strong><span>Budget '+capMoney(budget)+'</span></div>'+
+ '<p>MTD <b>'+capMoney(mtd)+'</b> ('+capPercent(m)+') ? RR <b>'+capMoney(rr)+'</b> ('+capPercent(r)+')</p>'+
+ '<div class="cap-track" aria-hidden="true"><i class="cap-rr" style="width:'+((r||0)/scale*100)+'%"></i><i class="cap-mtd" style="width:'+((m||0)/scale*100)+'%"></i><i class="cap-limit" style="left:'+(100/scale)+'%"></i></div></article>';
+}
+function renderChurnCap(){
+ const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value;
+ const model=capBranchModel(service,group,region),typeSelect=$("capType"),old=typeSelect.value;
+ const types=[...new Set(model.rows.map(r=>r.type).filter(Boolean))].sort();
+ typeSelect.innerHTML='<option value="ALL">�ء Type Shop</option>'+types.map(t=>'<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>').join("");
+ typeSelect.value=types.includes(old)?old:"ALL";
+ const query=$("capSearch").value.trim().toLowerCase(),status=$("capStatus").value;
+ const scoped=model.rows.filter(r=>(typeSelect.value==="ALL"||r.type===typeSelect.value)&&(!query||r.name.toLowerCase().includes(query)));
+ const rows=scoped.filter(r=>status==="ALL"||r.status===status),total=capAggregate(rows);
+ $("capScope").textContent=scopeLabel(group,region)+" � "+rows.length+" ��¡���Ң�/Product � "+model.periods.map(p=>p.product+": Churn "+fmtDate(p.churnDate)+" / Downsell "+fmtDate(p.downDate)).join(" � ");
+ $("capAvailability").textContent="Budget �ҡ Retention Focus Tier �����͹������͡ � Out Flow = Churn Value + Downsell Retention + Downsell Aftersale �����§ҹ���� � �ѧ����բ������׹�ѹ Churn DTAC ��� Share Plan �¡ �֧���ǡ������� � RR �ӹǳ�¡����ѹ�����Ţͧ����ͧ���Сͺ ���Ǩ֧���"+(model.periods.some(p=>!p.sameMonth)?" � �ժش���������ú��͹���ǡѹ �֧����ʴ� Cap ������¡�ù��":"");
+ const card=(label,value,note)=>'<article class="customer-metric"><small>'+label+'</small><strong>'+value+'</strong><span>'+note+'</span></article>';
+ $("capCards").innerHTML=card("BUDGET OUT FLOW",capMoney(total.budget),"Budget Churn + Budget Downsell �����͹")+
+ card("OUT FLOW MTD",capMoney(total.mtd),"��������ѹ�����������Ъش")+
+ card("%CHURN CAP MTD",capPercent(total.mtdRatio),"Out Flow MTD ? Budget �����͹")+
+ card("RR %CHURN CAP",capPercent(total.rrRatio),"RR Out Flow "+capMoney(total.rr))+
+ card("BUDGET �������",capMoney(total.remaining),"Budget �����͹ ? Out Flow MTD");
+ $("capBudgetBars").innerHTML=capBudgetBar("Churn",total.churn,total.churnRR,total.churnBudget)+capBudgetBar("Downsell",total.down,total.downRR,total.downBudget)+capBudgetBar("Out Flow ���",total.mtd,total.rr,total.budget);
+ $("capComponents").innerHTML='<dl>'+[["Churn Value",total.churn],["Downsell Retention",total.retention],["Downsell Aftersale",total.aftersale],["Out Flow ���",total.mtd]].map(([label,value])=>'<div><dt>'+label+'</dt><dd>'+capMoney(value)+'</dd></div>').join("")+'</dl>';
+ const areas=new Map();rows.forEach(r=>{const key=r.product+"|"+r.area;if(!areas.has(key))areas.set(key,[]);areas.get(key).push(r);});
+ const areaRows=[...areas.values()].map(items=>({...capAggregate(items),product:items[0].product,area:items[0].area}));
+ const rank=(a,b)=>(b.rrRatio??-1)-(a.rrRatio??-1);
+ areaRows.sort(rank);rows.sort(rank);
+ $("capAreaTable").innerHTML=capTable(areaRows,false);$("capBranchTable").innerHTML=capTable(rows,true);
+ const over=rows.filter(r=>r.status==="over"),near=rows.filter(r=>r.status==="near"),unknown=rows.filter(r=>r.status==="unknown");
+ const findings=[];
+ findings.push('�Թ Cap <strong>'+over.length+'</strong> ��¡�� � ��� Cap (90�100%) <strong>'+near.length+'</strong> ��¡�� � ���������ú/����� Budget <strong>'+unknown.length+'</strong> ��¡��');
+ if(total.gap!==null)findings.push('�Ҵ��ó� Out Flow �����͹ <strong>'+capMoney(total.rr)+'</strong> ��º Budget '+capMoney(total.budget)+' � '+(total.gap>0?'�Թ':'��ӡ���')+' Budget <strong>'+capMoney(Math.abs(total.gap))+'</strong>');
+ const highest=[...over].sort((a,b)=>(b.gap||0)-(a.gap||0)).slice(0,3);
+ if(highest.length)findings.push('�Ңҷ���õԴ�����͹ (��Ť�ҤҴ��ó��Թ Budget �٧�ش): '+highest.map(r=>escapeHtml(r.name)+' ('+r.product+') <strong>'+capMoney(r.gap)+'</strong>').join(' � '));
+ if(total.churnRR!==null&&total.downRR!==null)findings.push('ͧ���Сͺ RR ����٧����: <strong>'+(total.churnRR>=total.downRR?'Churn':'Downsell')+'</strong> � ��Ǩ���˵��˹�� Solution ��еԴ���������Ң�');
+ $("capFindings").innerHTML=findings.map(t=>'<li>'+t+'</li>').join("");
+}
+
+
 function render(){
   const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value,data=latestRows(service,group,region),now=aggregatePerformance(data.now),before=aggregatePerformance(data.before);
   renderPeriodLabels(data.prior,data.latest);
@@ -713,7 +820,7 @@ function render(){
   const areaPool=store.performance.filter(row=>row["Report Date"]===data.latest&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)),areas=groupAreas(areaPool);
   bars("saveRateBars",areas,"saveRate",{max:1,sort:"asc",kind:"teal",noteKey:item=>item.saveRate<.88?"ต่ำกว่าเป้าหมาย 88%":"ผ่านเป้าหมาย 88%"});
   bars("runRateBars",areas,"rrCap",{max:Math.max(1.6,...areas.map(item=>item.rrCap)),sort:"desc",kind:"warn",noteKey:item=>item.rrCap>1?`เกิน Cap ${fmtPct(item.rrCap-1)}`:"อยู่ใน Cap"});
-  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();renderPageFocus(service,group,region);renderExecutiveSummary(service,group,region);
+  renderAreaFocusTable(service,group,region);const downsell=renderDownsell(group,region);renderInsights(now,before,areas,downsell);renderHallCards(group,region);renderBranchTable(service,group,region);renderDownsellTables(group,region);renderDownsellTolTables(group,region);renderSolutions();renderPageFocus(service,group,region);renderExecutiveSummary(service,group,region);renderChurnCap();
 }
 
 
@@ -769,11 +876,15 @@ function fitTableCapture(mode){
 function closeTableCapture(){const opener=tableCaptureState?.opener;$("tableCaptureDialog").close();tableCaptureState=null;opener?.focus();}
 
 function setPartition(partition){
+  $("churnCapPartition").hidden=partition!=="churnCap";
   $("executivePartition").hidden=partition!=="executive";
-  document.querySelectorAll(".partition-tab").forEach(button=>{const active=button.dataset.partition===partition;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active));});
+  document.querySelectorAll(".partition-tab[data-partition]").forEach(button=>{const active=button.dataset.partition===partition;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active));});
   $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("downsellTolPartition").hidden=partition!=="downsellTol";$("solutionPartition").hidden=partition!=="solution";
 }
 
+["capType","capStatus"].forEach(id=>$(id).addEventListener("change",renderChurnCap));
+$("capSearch").addEventListener("input",renderChurnCap);
+$("capReset").addEventListener("click",()=>{$("capType").value="ALL";$("capStatus").value="ALL";$("capSearch").value="";renderChurnCap();});
 $("monthTabs").addEventListener("click",event=>{const button=event.target.closest("[data-month]");if(button)selectReportMonth(button.dataset.month);});
 $("executiveCopy").addEventListener("click",copyExecutiveNote);
 $("executiveShortcut").addEventListener("click",()=>{setPartition("executive");$("executivePartition").scrollIntoView({behavior:"smooth",block:"start"});});
@@ -784,7 +895,7 @@ $("shopTypeFilter").addEventListener("change",render);
 $("solutionBranchFilter").addEventListener("change",renderSolutions);
 $("solutionMetricFilter").addEventListener("change",renderSolutions);
 $("refreshButton").addEventListener("click",loadData);
-document.querySelectorAll(".partition-tab").forEach(button=>button.addEventListener("click",()=>setPartition(button.dataset.partition)));
+document.querySelectorAll(".partition-tab[data-partition]").forEach(button=>button.addEventListener("click",()=>setPartition(button.dataset.partition)));
 $("captureModeButton").addEventListener("click",()=>{const active=document.body.classList.toggle("capture-mode");$("captureModeButton").textContent=active?"✕ ออกจากโหมด Capture":"⛶ โหมด Capture";});
 $("tableCaptureClose").addEventListener("click",closeTableCapture);
 $("tableCaptureFit").addEventListener("click",()=>fitTableCapture("frame"));

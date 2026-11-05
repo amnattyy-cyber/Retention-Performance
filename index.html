@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261106-oct31">
+  <link rel="stylesheet" href="styles.css?v=20261106-churn-cap">
 </head>
 <body>
   <header class="hero">
@@ -69,8 +69,32 @@
       <button class="partition-tab" type="button" data-partition="downsell" aria-selected="false">Downsell TMH</button>
       <button class="partition-tab" type="button" data-partition="downsellTol" aria-selected="false">Downsell TOL</button>
       <button class="partition-tab" type="button" data-partition="solution" aria-selected="false">Solution Analysis</button>
+      <button class="partition-tab" type="button" data-partition="churnCap" aria-selected="false">Churn Cap / Budget</button>
       <button class="capture-toggle" id="captureModeButton" type="button">⛶ โหมด Capture</button>
     </nav>
+
+
+    <div id="churnCapPartition" class="partition" hidden>
+      <section class="cap-view">
+        <div class="section-title"><div><span>CC</span><h2>Churn Cap — เทียบ Budget Churn / Downsell</h2></div></div>
+        <p id="capScope"></p>
+        <div class="cap-notice" id="capAvailability"></div>
+        <div class="cap-controls">
+          <label>Type Shop<select id="capType"><option value="ALL">ทุก Type Shop</option></select></label>
+          <label>สถานะ RR %Churn Cap<select id="capStatus"><option value="ALL">ทุกสถานะ</option><option value="safe">อยู่ใน Cap (&lt;90%)</option><option value="near">ใกล้ Cap (90–100%)</option><option value="over">เกิน Cap (&gt;100%)</option><option value="unknown">ข้อมูลไม่ครบ / ไม่มี Budget</option></select></label>
+          <label>ค้นหาสาขา<input id="capSearch" type="search" placeholder="ชื่อสาขา"></label>
+          <button id="capReset" type="button">ล้างตัวกรองหน้านี้</button>
+        </div>
+        <div class="cap-cards customer-revenue-grid" id="capCards"></div>
+        <div class="cap-panels">
+          <article class="panel"><div class="panel__head"><h3>องค์ประกอบ Out Flow (MTD)</h3></div><div id="capComponents"></div></article>
+          <article class="panel"><div class="panel__head"><h3>Budget แยก Churn / Downsell</h3></div><div id="capBudgetBars"></div><p class="cap-legend">แท่งเข้ม = MTD · แท่งอ่อน = RR · เส้นตั้ง = 100% ของ Budget</p></article>
+        </div>
+        <article class="panel customer-findings"><h3>สรุปและสาขาที่ควรติดตาม</h3><ul id="capFindings"></ul></article>
+        <article class="panel"><div class="panel__head"><h3>Churn Cap by Area</h3><p>รวมจากรายสาขาตามตัวกรอง · RR เกิน Budget เป็นค่าบวก</p></div><div class="table-scroll" id="capAreaTable" tabindex="0" role="region" aria-label="Churn Cap by Area"></div></article>
+        <article class="panel"><div class="panel__head"><h3>Churn Cap by Branch</h3><p>ซ่อนรายการที่ไม่มีทั้ง Budget และ Transaction · เรียง RR %Churn Cap สูงสุดก่อน</p></div><div class="table-scroll" id="capBranchTable" tabindex="0" role="region" aria-label="Churn Cap by Branch"></div></article>
+      </section>
+    </div>
 
     <div id="executivePartition" class="partition" hidden>
       <section aria-labelledby="executiveTitle">
@@ -405,7 +429,7 @@
   </dialog>
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
-  <script src="app.js?v=20261106-oct31"></script>
+  <script src="app.js?v=20261106-churn-cap"></script>
 </body>
 </html>
 

@@ -250,3 +250,24 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
 [data-service="tol"] .executive-table thead th{background:#dff0fc;color:#175982}
 @media(max-width:1100px){.executive-pair{grid-template-columns:1fr}}
 @media(max-width:700px){.executive-kpis{grid-template-columns:1fr}.executive-findings{grid-template-columns:1fr}.executive-shortcut{align-items:flex-start;flex-direction:column}.executive-block{padding:16px}.executive-note-head{align-items:flex-start;flex-direction:column}}
+
+/* Churn Cap budget comparison */
+.cap-view{display:grid;gap:20px}.cap-view .section-title{margin-bottom:0}
+.cap-notice{border-left:4px solid #d88917;background:#fff8e9;padding:15px 18px;font-size:14px;line-height:1.8;border-radius:8px;color:#684818}
+.cap-controls{display:flex;gap:16px;align-items:end;flex-wrap:wrap;padding:20px;background:white;border:1px solid #dfe5ef;border-radius:16px}
+.cap-controls label{display:grid;gap:7px;font-size:13px;font-weight:700;flex:1;min-width:190px}
+.cap-controls select,.cap-controls input{border:1px solid #cdd7e7;background:#fff;border-radius:8px;padding:11px;font:inherit;min-width:0;width:100%}
+.cap-controls button{padding:11px 16px;border:1px solid #cdd7e7;background:#fff;border-radius:8px;color:#20385e;cursor:pointer}
+.cap-cards{grid-template-columns:repeat(5,minmax(0,1fr))}.cap-cards strong{font-size:clamp(20px,2.2vw,30px)}
+.cap-panels{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+#capComponents dl{padding:0 22px}#capComponents dl div{display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px dashed #dfe5ef}
+#capComponents dd{font-weight:800;margin:0}#capComponents dt{font-size:15px}
+#capBudgetBars{padding:0 22px}.cap-budget-row{padding:12px 0 18px;border-bottom:1px dashed #dfe5ef}.cap-budget-row>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.cap-budget-row p{font-size:13px;margin:10px 0}.cap-track{height:10px;background:#eef1f7;position:relative;border-radius:8px}
+.cap-track i{position:absolute;left:0;top:0;height:100%;border-radius:8px}.cap-rr{background:#ccd5e8}.cap-mtd{background:#274a85}.cap-track .cap-limit{background:#111c35;width:2px;height:18px;top:-4px;border-radius:0}
+.cap-legend{padding:0 22px;font-size:12px;color:#66758c}.cap-badge{display:inline-block;border-radius:20px;padding:5px 10px;font-size:13px;white-space:nowrap;background:#eef1f7;color:#52617a}
+.cap-badge.safe{background:#e4f7ef;color:#117755}.cap-badge.near{background:#fff3dc;color:#9b6200}.cap-badge.over{background:#ffe6e9;color:#b8203c}
+.cap-table{font-size:16px}.cap-table th,.cap-table td{padding:14px 16px;white-space:nowrap}.cap-table tbody th{min-width:220px;white-space:normal;text-align:left}
+.cap-table thead th{background:#17294d;color:#fff}html[data-service="tol"] .cap-table thead th{background:#176eae}
+@media(max-width:1000px){.cap-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.cap-panels{grid-template-columns:1fr}}
+@media(max-width:520px){.cap-cards{grid-template-columns:1fr}.cap-controls label{min-width:100%}}
