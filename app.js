@@ -3,14 +3,14 @@ const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit
 const PERF_HEADERS = ["Report Date","Service","Region","No Shop","Rev Request","Rev Save","Churn Value","Budget Churn Month","Cutoff Day","Days in Month","Save Rate","RR Churn","RR / Cap","Tier"];
 const DOWN_HEADERS = ["Report Date","Region","No Shop","Budget Downsell","Downsell Retention","Downsell Aftersale","Cutoff Day","Days in Month","Total Downsell","RR Downsell","MTD / Budget","RR / Budget","Over Budget Records","Status"];
 const BRANCH_HEADERS = ["Report Date","Service","Area Group","Region","Shop Name","Shop Type","Request Sep","Request Oct","Request MoM","Request %MoM","Save Sep","Save Oct","Save MoM","Save %MoM","Churn Sep","Churn Oct","Churn MoM","Churn %MoM","Save Rate Sep","Save Rate Oct","Save Rate MoM","Budget Churn","MTD Budget Churn","Over Budget","Tier","Cutoff Day","Days in Month"];
-const DOWNSELL_DETAIL_HEADERS = ["Report Date","Level","Area Group","Region","Shop Name","Shop Type","No Shop","Budget Downsell","Downsell Retention","Downsell Aftersale","Total Downsell","RR Downsell","MTD / Budget","RR / Budget","Over Budget Records","Status","Last Month","Cutoff Day","Days in Month"];
+const DOWNSELL_DETAIL_HEADERS = ["Report Date","Level","Area Group","Region","Shop Name","Shop Type","No Shop","Budget Downsell","Downsell Retention","Downsell Aftersale","Total Downsell","RR Downsell","MTD / Budget","RR / Budget","Over Budget Records","Status","Last Month","Cutoff Day","Days in Month","Downsell %MoM"];
 const SOLUTION_HEADERS = ["Report Date","Product","Area Group","Region","Shop Name","Solution Name","Request Sub","Rev Request","Rev Save","Churn Value","Cutoff Day","Days in Month"];
 const GVIZ_RANGES = {
   Performance_Daily: "A1:N1000",
   Downsell_Area_Daily: "A1:N1012",
   Branch_Performance_Daily: "A1:AA2050",
-  Downsell_Performance_Daily: "A1:S1200",
-  Downsell_TOL_Daily: "A1:S1000",
+  Downsell_Performance_Daily: "A1:T1200",
+  Downsell_TOL_Daily: "A1:T1000",
   Solution_Performance_Daily: "A1:L10000"
 };
 const AREA_GROUPS = {
@@ -161,7 +161,9 @@ function latestRows(service,group,region){
   const dates=[...new Set(pool.map(row=>row["Report Date"]))].sort(),latest=dates.at(-1);
   if(!latest)return {latest:null,prior:null,now:[],before:[]};
   const priorDate=new Date(latest+"T00:00:00");priorDate.setDate(1);priorDate.setMonth(priorDate.getMonth()-1);const priorMonth=priorDate.getFullYear()+"-"+String(priorDate.getMonth()+1).padStart(2,"0");
-  const prior=dates.filter(date=>date.slice(0,7)===priorMonth).at(-1)||dates.filter(date=>date<latest).at(-1);
+  const priorDay=Math.min(Number(latest.slice(8,10)),new Date(priorDate.getFullYear(),priorDate.getMonth()+1,0).getDate());
+  const priorLimit=priorMonth+"-"+String(priorDay).padStart(2,"0");
+  const prior=dates.filter(date=>date.slice(0,7)===priorMonth&&date<=priorLimit).at(-1);
   return {latest,prior,now:pool.filter(row=>row["Report Date"]===latest),before:pool.filter(row=>row["Report Date"]===prior)};
 }
 
@@ -311,9 +313,8 @@ function renderBranchTable(service,group,region){
 }
 
 function downsellDetailData(level,group,region){
-  const source=level==="AREA"&&store.live
-    ? store.downsell
-    : store.downsellDetails.filter(row=>String(row.Level).toUpperCase()===level);
+  const detail=store.downsellDetails.filter(row=>String(row.Level).toUpperCase()===level);
+  const source=detail.length?detail:(level==="AREA"?store.downsell:[]);
   let pool=source.filter(row=>inScope(row.Region,group,region));
   const latest=[...new Set(pool.map(row=>row["Report Date"]))].sort().at(-1);
   pool=pool.filter(row=>row["Report Date"]===latest);
@@ -326,14 +327,19 @@ function downsellDetailData(level,group,region){
 
 const hasDownsellBudgetOrTransaction=row=>n(row["Budget Downsell"])!==0||n(row["Total Downsell"])!==0;
 const budgetStatus=row=>n(row["RR / Budget"])>1?"over":"safe";
+function downsellMomCells(row){
+ const base=row["Last Month"],current=row["RR / Budget"],valid=typeof base==="number"&&Number.isFinite(base)&&base>0&&typeof current==="number"&&Number.isFinite(current);
+ const mom=valid?current/base-1:null;
+ return `<td>${typeof base==="number"&&Number.isFinite(base)?fmtPct(base):"—"}</td><td class="${mom===null?"neutral":deltaClass(mom,true)}" title="${mom===null?"ไม่มีฐานเดือนก่อนที่ใช้คำนวณได้":"(RR/Budget เดือนนี้ ÷ RR/Budget เดือนก่อน − 1) × 100"}">${mom===null?"—":fmtDelta(mom)}</td>`;
+}
 function downsellAreaRowHtml(row){
   const state=budgetStatus(row);
-  return `<tr><th class="area-name" scope="row">${escapeHtml(row.Region)}</th><td>${fmtFull(row["No Shop"])}</td><td>${fmtFull(row["Budget Downsell"])}</td><td>${fmtFull(row["Downsell Retention"])}</td><td>${fmtFull(row["Downsell Aftersale"])}</td><td>${fmtFull(row["Total Downsell"])}</td><td>${fmtFull(row["RR Downsell"])}</td><td>${fmtPct(row["MTD / Budget"])}</td><td class="over-budget ${state==="over"?"bad":"good"}">${fmtPct(row["RR / Budget"])}</td><td>${fmtFull(row["Over Budget Records"])}</td><td><span class="budget-pill ${state}">${escapeHtml(row.Status||(state==="over"?"Over Budget":"In Budget"))}</span></td></tr>`;
+  return `<tr><th class="area-name" scope="row">${escapeHtml(row.Region)}</th><td>${fmtFull(row["No Shop"])}</td><td>${fmtFull(row["Budget Downsell"])}</td><td>${fmtFull(row["Downsell Retention"])}</td><td>${fmtFull(row["Downsell Aftersale"])}</td><td>${fmtFull(row["Total Downsell"])}</td><td>${fmtFull(row["RR Downsell"])}</td><td>${fmtPct(row["MTD / Budget"])}</td><td class="over-budget ${state==="over"?"bad":"good"}">${fmtPct(row["RR / Budget"])}</td><td>${fmtFull(row["Over Budget Records"])}</td><td><span class="budget-pill ${state}">${escapeHtml(row.Status||(state==="over"?"Over Budget":"In Budget"))}</span></td>${downsellMomCells(row)}</tr>`;
 }
 
 function downsellBranchRowHtml(row){
   const state=budgetStatus(row);
-  return `<tr><th class="branch-name" scope="row">${escapeHtml(row["Shop Name"])}</th><td class="area-name">${escapeHtml(row.Region)}</td><td>${escapeHtml(row["Shop Type"])}</td><td>${fmtFull(row["Budget Downsell"])}</td><td>${fmtFull(row["Downsell Retention"])}</td><td>${fmtFull(row["Downsell Aftersale"])}</td><td>${fmtFull(row["Total Downsell"])}</td><td>${fmtFull(row["RR Downsell"])}</td><td>${fmtPct(row["MTD / Budget"])}</td><td class="over-budget ${state==="over"?"bad":"good"}">${fmtPct(row["RR / Budget"])}</td><td><span class="budget-pill ${state}">${escapeHtml(row.Status||(state==="over"?"Over Budget":"In Budget"))}</span></td><td>${row["Last Month"]===""?"—":fmtPct(row["Last Month"])}</td></tr>`;
+  return `<tr><th class="branch-name" scope="row">${escapeHtml(row["Shop Name"])}</th><td class="area-name">${escapeHtml(row.Region)}</td><td>${escapeHtml(row["Shop Type"])}</td><td>${fmtFull(row["Budget Downsell"])}</td><td>${fmtFull(row["Downsell Retention"])}</td><td>${fmtFull(row["Downsell Aftersale"])}</td><td>${fmtFull(row["Total Downsell"])}</td><td>${fmtFull(row["RR Downsell"])}</td><td>${fmtPct(row["MTD / Budget"])}</td><td class="over-budget ${state==="over"?"bad":"good"}">${fmtPct(row["RR / Budget"])}</td><td><span class="budget-pill ${state}">${escapeHtml(row.Status||(state==="over"?"Over Budget":"In Budget"))}</span></td>${downsellMomCells(row)}</tr>`;
 }
 
 function renderDownsellTolTables(group,region){
@@ -356,8 +362,8 @@ function renderDownsellTables(group,region){
   $("downsellAreaCount").textContent=`${areas.rows.length} ${areas.rows.length===1?"Area":"Areas"}`;
   $("downsellBranchCount").textContent=`${branches.rows.length} Branches`;
   $("downsellBranchNotice").textContent=store.downsellDetailLive?`ข้อมูล ณ ${fmtDate(branches.latest||areas.latest)} • แสดงชื่อสาขาเท่านั้น • ซ่อนรหัส TDS/WW • Service filter ไม่มีผลกับ Downsell`:`ไม่สามารถโหลด Downsell รายสาขาได้ กรุณาตรวจสิทธิ์ Google Sheet`;
-  $("downsellAreaTableBody").innerHTML=areas.rows.length?areas.rows.map(downsellAreaRowHtml).join(""):'<tr><td colspan="11" class="empty-state">ไม่มีข้อมูล Downsell ระดับ Area ตามตัวกรอง</td></tr>';
-  $("downsellBranchTableBody").innerHTML=branches.rows.length?branches.rows.map(downsellBranchRowHtml).join(""):'<tr><td colspan="12" class="empty-state">ไม่มีข้อมูล Downsell รายสาขาตามตัวกรอง</td></tr>';
+  $("downsellAreaTableBody").innerHTML=areas.rows.length?areas.rows.map(downsellAreaRowHtml).join(""):'<tr><td colspan="13" class="empty-state">ไม่มีข้อมูล Downsell ระดับ Area ตามตัวกรอง</td></tr>';
+  $("downsellBranchTableBody").innerHTML=branches.rows.length?branches.rows.map(downsellBranchRowHtml).join(""):'<tr><td colspan="13" class="empty-state">ไม่มีข้อมูล Downsell รายสาขาตามตัวกรอง</td></tr>';
 }
 
 const solutionMetricLabels={cases:"Request Sub",churn:"Churn Value",request:"Revenue Request",save:"Revenue Save"};
