@@ -824,6 +824,32 @@ function render(){
 
 
 let tableCaptureState=null;
+
+const tableFitPreferences=new WeakMap();
+let tableFitPending=false;
+function scheduleTableFit(){
+ if(tableFitPending)return;
+ tableFitPending=true;requestAnimationFrame(()=>{tableFitPending=false;fitPageTables();});
+}
+function fitPageTables(){
+ document.querySelectorAll(".partition table").forEach(table=>{
+  const wrap=table.closest(".table-scroll")||table.parentElement;
+  if(!wrap.clientWidth||!table.getClientRects().length)return;
+  let settings=tableFitPreferences.get(table);
+  if(!settings){settings={fit:true,width:table.style.width};tableFitPreferences.set(table,settings);}
+  table.style.zoom="1";table.style.width=settings.width;
+  wrap.classList.toggle("table-page-fit",settings.fit);
+  const natural=Math.max(table.scrollWidth,table.offsetWidth);
+  const scale=settings.fit?Math.min(1,wrap.clientWidth/Math.max(1,natural)):1;
+  if(settings.fit){table.style.width=natural+"px";table.style.zoom=String(scale);}
+  const controls=wrap.previousElementSibling;
+  const size=controls?.querySelector("[data-fit-size]"),label=Math.round(scale*100)+"%";
+  if(size&&size.textContent!==label)size.textContent=label;
+  controls?.querySelector("[data-fit-page]")?.setAttribute("aria-pressed",String(settings.fit));
+  controls?.querySelector("[data-fit-actual]")?.setAttribute("aria-pressed",String(!settings.fit));
+ });
+}
+
 function installTableCaptureButtons(){
  document.querySelectorAll(".partition table").forEach(table=>{
   const wrap=table.closest(".table-scroll")||table.parentElement;
@@ -831,7 +857,12 @@ function installTableCaptureButtons(){
   const tools=document.createElement("div");tools.className="table-capture-tools";
   const button=document.createElement("button");button.type="button";button.className="table-capture-button";button.textContent="⛶ Capture ตารางเต็มกรอบ";
   button.addEventListener("click",()=>openTableCapture(wrap.querySelector("table")));
-  tools.appendChild(button);wrap.before(tools);
+  const fit=document.createElement("button");fit.type="button";fit.className="table-capture-button";fit.dataset.fitPage="";fit.textContent="Fit to page";
+ const actual=document.createElement("button");actual.type="button";actual.className="table-capture-button";actual.dataset.fitActual="";actual.textContent="ขนาดจริง 100%";
+ const size=document.createElement("span");size.dataset.fitSize="";size.className="table-fit-size";
+ const change=value=>{const target=wrap.querySelector("table");if(!target)return;const state=tableFitPreferences.get(target)||{width:target.style.width};state.fit=value;tableFitPreferences.set(target,state);scheduleTableFit();};
+ fit.addEventListener("click",()=>change(true));actual.addEventListener("click",()=>change(false));
+ tools.append(fit,actual,size,button);wrap.before(tools);
  });
 }
 function openTableCapture(table){
@@ -847,6 +878,7 @@ function openTableCapture(table){
  const notice=container?.querySelector(".data-notice,.branch-data-notice");
  if(notice?.textContent)detail.textContent+=" • "+notice.textContent;
  const copy=table.cloneNode(true);
+ copy.style.zoom="1";
  copy.removeAttribute("id");copy.querySelectorAll("[id]").forEach(el=>el.removeAttribute("id"));
  copy.querySelectorAll("th,td").forEach(cell=>{cell.style.setProperty("position","static","important");cell.style.setProperty("overflow","visible","important");cell.style.setProperty("text-overflow","clip","important");});
  copy.querySelectorAll("caption").forEach(el=>el.remove());
@@ -875,6 +907,7 @@ function fitTableCapture(mode){
 function closeTableCapture(){const opener=tableCaptureState?.opener;$("tableCaptureDialog").close();tableCaptureState=null;opener?.focus();}
 
 function setPartition(partition){
+  scheduleTableFit();
   $("churnCapPartition").hidden=partition!=="churnCap";
   $("executivePartition").hidden=partition!=="executive";
   document.querySelectorAll(".partition-tab[data-partition]").forEach(button=>{const active=button.dataset.partition===partition;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active));});
@@ -902,11 +935,14 @@ $("tableCaptureWidth").addEventListener("click",()=>fitTableCapture("width"));
 $("tableCaptureActual").addEventListener("click",()=>fitTableCapture("actual"));
 $("tableCapturePrint").addEventListener("click",()=>window.print());
 $("tableCaptureDialog").addEventListener("cancel",event=>{event.preventDefault();closeTableCapture();});
-window.addEventListener("resize",()=>{if(tableCaptureState)fitTableCapture(tableCaptureState.mode);});
+window.addEventListener("resize",()=>{scheduleTableFit();if(tableCaptureState)fitTableCapture(tableCaptureState.mode);});
 let captureInstallPending=false;
-const captureObserver=new MutationObserver(()=>{if(captureInstallPending)return;captureInstallPending=true;requestAnimationFrame(()=>{captureInstallPending=false;installTableCaptureButtons();});});
+const captureObserver=new MutationObserver(()=>{if(captureInstallPending)return;captureInstallPending=true;requestAnimationFrame(()=>{captureInstallPending=false;installTableCaptureButtons();scheduleTableFit();});});
 document.querySelectorAll(".partition").forEach(part=>captureObserver.observe(part,{childList:true,subtree:true}));
 installTableCaptureButtons();
+scheduleTableFit();
+if(document.fonts?.ready)document.fonts.ready.then(scheduleTableFit);
+if(typeof ResizeObserver!=="undefined"){const observer=new ResizeObserver(scheduleTableFit);observer.observe(document.querySelector("main.dashboard"));}
 $("sheetLink").href=SHEET_URL;
 loadData();
 window.setInterval(()=>{if(document.visibilityState==="visible")loadData();},5*60*1000);

@@ -271,3 +271,12 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
 .cap-table thead th{background:#17294d;color:#fff}html[data-service="tol"] .cap-table thead th{background:#176eae}
 @media(max-width:1000px){.cap-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.cap-panels{grid-template-columns:1fr}}
 @media(max-width:520px){.cap-cards{grid-template-columns:1fr}.cap-controls label{min-width:100%}}
+
+/* Fit every table to its page container; keep an explicit readable-size option. */
+.partition,.panel,.focus-table-card,.solution-comparison-card,.solution-matrix-card{min-width:0}
+.partition .table-scroll.table-page-fit{max-height:none!important;overflow-x:hidden;overflow-y:visible}
+.table-page-fit table{transform-origin:top left}
+.table-capture-tools{gap:8px;align-items:center;flex-wrap:wrap}
+.table-capture-button[aria-pressed="true"]{background:#17385b;color:white;border-color:#17385b}
+.table-fit-size{font-size:13px;color:#586c85;margin-right:auto}
+@media print{.table-capture-tools{display:none!important}}
