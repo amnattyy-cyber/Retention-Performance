@@ -119,7 +119,7 @@ let liveMonthlyStatus=null;
 let selectedReportMonth="live";
 let monthSelectionVersion=0;
 let octoberSnapshotPromise=null;
-const MONTH_ARCHIVES={"2026-10":{label:"October 2026",url:"archives/2026-10.json",note:"ข้อมูลย้อนหลังที่บันทึกไว้ • Retention / Downsell TOL / Solution ณ 30 Oct 2026 • Downsell TMH ณ 29 Oct 2026 • ยังไม่ใช่ยอดปิดเดือน 31 Oct"}};
+const MONTH_ARCHIVES={"2026-10":{label:"October 2026",url:"archives/2026-10.json?v=20261106-oct31",note:"ยอดปิดเดือน October 2026 • Retention TMH/TOL, Downsell TMH/TOL และ Solution ณ 31 Oct 2026"}};
 function snapshotStore(data){
   return {performance:rowObjects(data.performance,PERF_HEADERS),branches:rowObjects(data.branches,BRANCH_HEADERS),
     downsell:rowObjects(data.tmh.filter(row=>row[1]==="AREA").map(row=>[row[0],row[3],row[6],row[7],row[8],row[9],row[17],row[18],row[10],row[11],row[12],row[13],row[14],row[15]]),DOWN_HEADERS),downsellDetails:rowObjects(data.tmh,DOWNSELL_DETAIL_HEADERS),
