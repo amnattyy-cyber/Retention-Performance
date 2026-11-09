@@ -153,33 +153,56 @@ async function selectReportMonth(month){
   }catch(error){if(version===monthSelectionVersion){renderMonthControls();$("monthNote").textContent="โหลดข้อมูลย้อนหลังไม่สำเร็จ กรุณาลองเลือกเดือนอีกครั้ง";}}
 }
 
+
+let dashboardLoadInProgress=false;
+function validateDashboardData(data){
+ const numeric=(rows,fields)=>rows.length&&rows.every(row=>fields.every(field=>typeof row[field]==="number"&&Number.isFinite(row[field])));
+ const latest=rows=>{const date=rows.map(r=>r["Report Date"]).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().at(-1);return rows.filter(r=>date&&r["Report Date"]===date);};
+ const perf=latest(data.performance),branch=latest(data.branches);
+ if(!numeric(perf,["Rev Request","Rev Save","Churn Value","Budget Churn Month"])||!numeric(branch,["Request Oct","Save Oct","Churn Oct","Budget Churn","MTD Budget Churn"]))throw Error("Retention invalid");
+ for(const product of ["TMH","TOL"]){
+  const areas=perf.filter(r=>r.Service===product),shops=branch.filter(r=>r.Service===product);
+  if(new Set(areas.map(r=>r.Region)).size!==15||new Set(shops.map(r=>r.Region)).size!==15)throw Error("Missing Retention areas");
+  if(shops.some(r=>r["Report Date"]!==areas[0]["Report Date"])||Math.abs(sum(areas,"Rev Save")-sum(shops,"Save Oct"))>1)throw Error("Retention totals mismatch");
+ }
+ for(const dataset of [data.downsellDetails,data.tolDownsellDetails]){
+  const rows=latest(dataset),areas=rows.filter(r=>r.Level==="AREA"),shops=rows.filter(r=>r.Level==="BRANCH");
+  if(!numeric(rows,["Budget Downsell","Total Downsell","RR Downsell","Downsell Retention","Downsell Aftersale"])||areas.length!==15||!shops.length)throw Error("Downsell invalid");
+  if(Math.abs(sum(areas,"Total Downsell")-sum(shops,"Total Downsell"))>1)throw Error("Downsell totals mismatch");
+ }
+ const solution=latest(data.solutions);
+ if(!numeric(solution,["Rev Request","Rev Save","Churn Value"])||["TMH","TOL"].some(p=>new Set(solution.filter(r=>r.Product===p&&Object.values(AREA_GROUPS).flat().includes(r.Region)).map(r=>r.Region)).size!==15))throw Error("Solution invalid");
+ return data;
+}
 async function loadData(){
-  const status=$("dataStatus");
-  status.className="status-pill";
-  status.innerHTML="<span></span>กำลังโหลดข้อมูล...";
-  const [performance,downsell,branches,downsellDetails,tolDownsellDetails,solutions]=await Promise.allSettled([
-    loadGviz("Performance_Daily"),loadGviz("Downsell_Area_Daily"),loadGviz("Branch_Performance_Daily"),loadGviz("Downsell_Performance_Daily"),loadGviz("Downsell_TOL_Daily"),loadGviz("Solution_Performance_Daily")
-  ]);
-  const coreLive=performance.status==="fulfilled"&&downsell.status==="fulfilled";
-  store={
-    performance:coreLive?rowObjects(performance.value,PERF_HEADERS):rowObjects(window.RETENTION_FALLBACK.performance,PERF_HEADERS),
-    downsell:coreLive?rowObjects(downsell.value,DOWN_HEADERS):rowObjects(window.RETENTION_FALLBACK.downsell,DOWN_HEADERS),
-    branches:branches.status==="fulfilled"?rowObjects(branches.value,BRANCH_HEADERS):[],
-    downsellDetails:downsellDetails.status==="fulfilled"?rowObjects(downsellDetails.value,DOWNSELL_DETAIL_HEADERS):[],
-    tolDownsellDetails:tolDownsellDetails.status==="fulfilled"?rowObjects(tolDownsellDetails.value,DOWNSELL_DETAIL_HEADERS).filter(validDownsellRow):[],
-    solutions:solutions.status==="fulfilled"?rowObjects(solutions.value,SOLUTION_HEADERS):solutionFallbackRows(),
-    live:coreLive,
-    branchLive:branches.status==="fulfilled",
-    downsellDetailLive:downsellDetails.status==="fulfilled",
-    tolDownsellDetailLive:tolDownsellDetails.status==="fulfilled",
-    solutionLive:solutions.status==="fulfilled"
-  };
-  if(coreLive&&store.branchLive&&store.downsellDetailLive&&store.tolDownsellDetailLive&&store.solutionLive){status.className="status-pill live";status.innerHTML="<span></span>Live from Google Sheet";}
-  else if(coreLive){status.className="status-pill fallback";status.innerHTML="<span></span>Live • บางตารางใช้ข้อมูลสำรอง";}
-  else{status.className="status-pill fallback";status.innerHTML="<span></span>Snapshot • รอสิทธิ์ Google Sheet";}
-  liveMonthlyStore=store;
+ if(dashboardLoadInProgress)return;
+ dashboardLoadInProgress=true;
+ const status=$("dataStatus");
+ status.className="status-pill";status.innerHTML="<span></span>กำลังตรวจสอบข้อมูลทุกหน้า...";
+ try{
+  const results=await Promise.allSettled(["Performance_Daily","Branch_Performance_Daily","Downsell_Performance_Daily","Downsell_TOL_Daily","Solution_Performance_Daily"].map(loadGviz));
+  let next,live=false;
+  try{
+   if(results.some(r=>r.status!=="fulfilled"))throw Error("Load failed");
+   const [performance,branches,tmh,tol,solutions]=results.map(r=>r.value);
+   next=validateDashboardData(snapshotStore({performance,branches,tmh,tol,solutions}));live=true;
+  }catch(error){
+   if(liveMonthlyStore){next=liveMonthlyStore;}
+   else{
+    const response=await fetch("archives/2026-11-08.json");
+    if(!response.ok)throw Error("Verified snapshot unavailable");
+    next=validateDashboardData(snapshotStore(await response.json()));
+   }
+  }
+  store=next;liveMonthlyStore=next;
+  const label=live?"Live • ตรวจสอบข้อมูลครบทุกหน้า":"ข้อมูลสำรองที่ตรวจสอบแล้ว • ต้นทางโหลดไม่ครบหรือสูตรผิดพลาด";
+  status.className="status-pill "+(live?"live":"fallback");status.innerHTML="<span></span>"+label;
   liveMonthlyStatus={className:status.className,html:status.innerHTML};
   await selectReportMonth(selectedReportMonth);
+  if(selectedReportMonth==="live"&&!live)$("monthNote").textContent="กำลังแสดงชุดข้อมูลล่าสุดที่ตรวจสอบผ่าน ตามวันที่ในแต่ละหน้า • ระบบจะลองเชื่อมต้นทางใหม่ทุก 5 นาที";
+ }catch(error){
+  status.className="status-pill fallback";status.innerHTML="<span></span>โหลดข้อมูลไม่สำเร็จ กรุณากดอัปเดตข้อมูลเพื่อลองใหม่";
+ }finally{dashboardLoadInProgress=false;}
 }
 
 function populateRegions(){
