@@ -121,6 +121,7 @@ let monthSelectionVersion=0;
 let octoberSnapshotPromise=null;
 const MONTH_ARCHIVES={"2026-10":{label:"October 2026",url:"archives/2026-10.json?v=20261106-oct31",note:"ยอดปิดเดือน October 2026 • Retention TMH/TOL, Downsell TMH/TOL และ Solution ณ 31 Oct 2026"}};
 function snapshotStore(data){
+  data=window.correctRetentionNames(data);
   return {performance:rowObjects(data.performance,PERF_HEADERS),branches:rowObjects(data.branches,BRANCH_HEADERS),
     downsell:rowObjects(data.tmh.filter(row=>row[1]==="AREA").map(row=>[row[0],row[3],row[6],row[7],row[8],row[9],row[17],row[18],row[10],row[11],row[12],row[13],row[14],row[15]]),DOWN_HEADERS),downsellDetails:rowObjects(data.tmh,DOWNSELL_DETAIL_HEADERS),
     tolDownsellDetails:rowObjects(data.tol,DOWNSELL_DETAIL_HEADERS).filter(validDownsellRow),
@@ -189,7 +190,7 @@ async function loadData(){
   }catch(error){
    if(liveMonthlyStore){next=liveMonthlyStore;}
    else{
-    const response=await fetch("archives/2026-11-08.json");
+    const response=await fetch("archives/2026-11-08.json?v=20261110-names");
     if(!response.ok)throw Error("Verified snapshot unavailable");
     next=validateDashboardData(snapshotStore(await response.json()));
    }
