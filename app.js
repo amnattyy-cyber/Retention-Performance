@@ -190,7 +190,7 @@ async function loadData(){
   }catch(error){
    if(liveMonthlyStore){next=liveMonthlyStore;}
    else{
-    const response=await fetch("archives/2026-11-08.json?v=20261110-names");
+    const response=await fetch("archives/2026-11-09.json?v=20261110-live");
     if(!response.ok)throw Error("Verified snapshot unavailable");
     next=validateDashboardData(snapshotStore(await response.json()));
    }
