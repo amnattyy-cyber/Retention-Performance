@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261109-complete-data">
+  <link rel="stylesheet" href="styles.css?v=20261125-dates">
 </head>
 <body>
   <header class="hero">
@@ -38,6 +38,18 @@
       <strong>เดือนรายงาน</strong>
       <nav id="monthTabs" class="partition-tabs" aria-label="เลือกเดือน"><button type="button" class="partition-tab is-active" data-month="live">เดือนล่าสุด</button></nav>
       <div id="monthNote" role="status" aria-live="polite" style="font-size:14px;line-height:1.7;color:#536480">กำลังตรวจสอบเดือนที่มีข้อมูล...</div>
+    </section>
+    <section class="panel date-panel" aria-label="เลือกช่วงวันที่รายงาน">
+      <div class="date-controls">
+        <label>ดูข้อมูลตามเวลา<select id="reportDateMode"><option value="latest">ตามเดือนรายงาน / ล่าสุด</option><option value="day">เลือกวันรายงาน</option><option value="range">เลือกช่วงวันที่</option></select></label>
+        <label id="reportDayLabel" hidden>วันรายงาน<select id="reportDay"><option value="">กำลังโหลดวันที่...</option></select></label>
+        <label id="reportStartLabel" hidden>วันที่เริ่มต้น<input id="reportStart" type="date"></label>
+        <label id="reportEndLabel" hidden>วันที่สิ้นสุด<input id="reportEnd" type="date"></label>
+        <button id="reportApply" type="button" disabled>แสดงข้อมูล</button>
+        <button id="reportReset" type="button">กลับข้อมูลล่าสุด</button>
+      </div>
+      <p class="date-help">แสดงยอดสะสม ณ วันรายงานล่าสุดที่มีในช่วงที่เลือก แยกตามชุดข้อมูล ไม่ใช่ยอดขายรวมเฉพาะช่วง และไม่บวกยอดสะสมหลายวันซ้ำกัน</p>
+      <p id="reportDateStatus" role="status" aria-live="polite">เลือกวันหรือช่วงวันที่เพื่อดูรายงานย้อนหลังที่บันทึกไว้</p>
     </section>
     <section class="control-bar" aria-label="ตัวกรองข้อมูล">
       <div class="control-heading">
@@ -430,7 +442,9 @@
   <noscript>กรุณาเปิด JavaScript เพื่อแสดง dashboard</noscript>
   <script src="fallback-data.js"></script>
   <script src="name-corrections.js?v=20261110-names"></script>
-  <script src="app.js?v=20261110-live"></script>
+  <script src="date-filter.js?v=20261125"></script>
+  <script src="app.js?v=20261125-dates"></script>
 </body>
 </html>
+
 

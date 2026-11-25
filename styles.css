@@ -280,3 +280,6 @@ body.capture-mode #solutionPartition .table-scroll{max-height:none;overflow:visi
 .table-capture-button[aria-pressed="true"]{background:#17385b;color:white;border-color:#17385b}
 .table-fit-size{font-size:13px;color:#586c85;margin-right:auto}
 @media print{.table-capture-tools{display:none!important}}
+
+
+.date-panel{padding:20px;margin-bottom:18px}.date-controls{display:flex;flex-wrap:wrap;align-items:end;gap:14px}.date-controls label{display:grid;gap:7px;font-size:14px;font-weight:600;min-width:170px}.date-controls [hidden]{display:none!important}.date-controls select,.date-controls input,.date-controls button{font:inherit;min-height:44px;border:1px solid #c7d3e4;border-radius:9px;padding:9px 12px;background:#fff;color:#172c50}.date-controls button{cursor:pointer;font-weight:600}#reportApply{background:#1c3f79;color:white}.date-controls button:disabled{opacity:.55;cursor:wait}.date-help,#reportDateStatus{font-size:14px;line-height:1.7;margin:12px 0 0;color:#536480}#reportDateStatus{color:#183c70}.date-empty{padding:24px;background:#f3f6fb;border:1px solid #d4deec;border-radius:12px;margin-bottom:18px;font-size:16px}.date-unavailable>:not(.date-empty){display:none!important}@media(max-width:600px){.date-controls label{width:100%}.date-controls button{flex:1}}

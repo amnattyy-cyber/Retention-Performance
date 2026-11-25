@@ -146,9 +146,9 @@ async function selectReportMonth(month){
       next=snapshotStore(await octoberSnapshotPromise);
     }
     if(version!==monthSelectionVersion||!next)return;
-    selectedReportMonth=month;store=next;
+    selectedReportMonth=month;store=dateSelection?ReportDates.filter(dateHistoryStore(),dateSelection.start,dateSelection.end):next;
     $("solutionBranchFilter").value="ALL";
-    renderMonthControls();populateRegions();render();
+    renderMonthControls();updateDateStatus();populateRegions();render();
     if(month==="live"&&liveMonthlyStatus){$("dataStatus").className=liveMonthlyStatus.className;$("dataStatus").innerHTML=liveMonthlyStatus.html;}
     if(month!=="live"){$("dataStatus").className="status-pill";$("dataStatus").innerHTML="<span></span>October • ข้อมูลย้อนหลังที่บันทึกไว้";}
   }catch(error){if(version===monthSelectionVersion){renderMonthControls();$("monthNote").textContent="โหลดข้อมูลย้อนหลังไม่สำเร็จ กรุณาลองเลือกเดือนอีกครั้ง";}}
@@ -229,8 +229,9 @@ function latestRows(service,group,region){
   const priorDate=new Date(latest+"T00:00:00");priorDate.setDate(1);priorDate.setMonth(priorDate.getMonth()-1);const priorMonth=priorDate.getFullYear()+"-"+String(priorDate.getMonth()+1).padStart(2,"0");
   const priorDay=Math.min(Number(latest.slice(8,10)),new Date(priorDate.getFullYear(),priorDate.getMonth()+1,0).getDate());
   const priorLimit=priorMonth+"-"+String(priorDay).padStart(2,"0");
-  const prior=dates.filter(date=>date.slice(0,7)===priorMonth&&date<=priorLimit).at(-1);
-  return {latest,prior,now:pool.filter(row=>row["Report Date"]===latest),before:pool.filter(row=>row["Report Date"]===prior)};
+  const comparisonPool=dateSelection?dateHistoryStore().performance.filter(row=>(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region)):pool;
+  const prior=[...new Set(comparisonPool.map(r=>r["Report Date"]))].sort().filter(date=>date.slice(0,7)===priorMonth&&date<=priorLimit).at(-1);
+  return {latest,prior,now:pool.filter(row=>row["Report Date"]===latest),before:comparisonPool.filter(row=>row["Report Date"]===prior)};
 }
 
 function renderKpis(now,before){
@@ -283,7 +284,7 @@ function comparisonRow(region,july,august){
 }
 
 function areaFocusData(service,group,region){
-  const pool=store.performance.filter(row=>row.Region&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region));
+  const pool=(dateSelection?dateHistoryStore().performance:store.performance).filter(row=>row.Region&&row.Region!=="ALL"&&(service==="ALL"||row.Service===service)&&inScope(row.Region,group,region));
   const {latest,prior}=latestRows(service,group,region),regions=[...new Set(pool.map(row=>row.Region))].sort();
   const rows=regions.map(area=>comparisonRow(area,areaSummary(pool.filter(row=>row.Region===area&&row["Report Date"]===prior)),areaSummary(pool.filter(row=>row.Region===area&&row["Report Date"]===latest))));
   const total=comparisonRow("Selection Total",areaSummary(pool.filter(row=>row["Report Date"]===prior)),areaSummary(pool.filter(row=>row["Report Date"]===latest)));
@@ -834,6 +835,7 @@ function renderChurnCap(){
 }
 
 function render(){
+  updateDateAvailability();
   const service=$("serviceFilter").value,group=$("areaGroupFilter").value,region=$("regionFilter").value,data=latestRows(service,group,region),now=aggregatePerformance(data.now),before=aggregatePerformance(data.before);
   renderPeriodLabels(data.prior,data.latest);
   document.documentElement.dataset.service=service.toLowerCase();
@@ -893,7 +895,7 @@ function openTableCapture(table){
  if(!table)return;
  const dialog=$("tableCaptureDialog"),sheet=$("tableCaptureSheet"),container=table.closest("article,.focus-table-card,.solution-matrix-card,.solution-comparison-card");
  const heading=container?.querySelector("h3,h2")?.textContent||table.caption?.textContent||"Performance";
- const scope=["serviceFilter","areaGroupFilter","regionFilter"].map(id=>$(id)?.selectedOptions?.[0]?.textContent).filter(Boolean);
+ const scope=[dateSelection?`ช่วงวันที่ ${dateSelection.start} ถึง ${dateSelection.end}`:"", ...["serviceFilter","areaGroupFilter","regionFilter"].map(id=>$(id)?.selectedOptions?.[0]?.textContent).filter(Boolean)].filter(Boolean);
  if(table.closest("#branchPartition"))scope.push($("shopTypeFilter").selectedOptions[0].textContent);
  if(table.closest("#solutionPartition"))scope.push($("solutionBranchFilter").selectedOptions[0].textContent);
  sheet.replaceChildren();
@@ -938,10 +940,64 @@ function setPartition(partition){
   $("overviewPartition").hidden=partition!=="overview";$("branchPartition").hidden=partition!=="branch";$("downsellPartition").hidden=partition!=="downsell";$("downsellTolPartition").hidden=partition!=="downsellTol";$("solutionPartition").hidden=partition!=="solution";
 }
 
+let dateSelection=null,dateArchives=[],dateHistoryPromise=null;
+function dateHistoryStore(){
+ // Only the most recent live snapshot per dataset is trustworthy; older sheet rows
+ // may be mutable import formulas. Published archives retain historical reports.
+ const current={...liveMonthlyStore};
+ for(const k of ReportDates.keys){const rows=current[k]||[],last=rows.map(r=>r['Report Date']).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().at(-1);current[k]=rows.filter(r=>r['Report Date']===last);}
+ return ReportDates.merge([...dateArchives,current]);
+}
+async function loadDateHistory(){
+ if(!dateHistoryPromise)dateHistoryPromise=Promise.all(['archives/2026-10.json?v=20261106-oct31','archives/2026-11-08.json','archives/2026-11-09.json'].map(async url=>{const r=await fetch(url);if(!r.ok)throw Error('โหลดข้อมูลย้อนหลังไม่ครบ กรุณาลองอีกครั้ง');return snapshotStore(await r.json());})).then(results=>{dateArchives=results;}).catch(error=>{dateHistoryPromise=null;throw error;});
+ await dateHistoryPromise;
+ const ds=ReportDates.dates(dateHistoryStore()),previous=$('reportDay').value;
+ $('reportDay').innerHTML=ds.slice().reverse().map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('');
+ if(ds.includes(previous))$('reportDay').value=previous;
+ for(const id of ['reportStart','reportEnd']){$(id).min=ds[0]||'';$(id).max=ds.at(-1)||'';if(!$(id).value)$(id).value=id==='reportStart'?(ds.at(-1)||'').slice(0,7)+'-01':ds.at(-1)||'';}
+}
+function resetDateSelection(){dateSelection=null;$('reportDateMode').value='latest';syncDateControls();}
+function syncDateControls(){const mode=$('reportDateMode').value;$('reportDayLabel').hidden=mode!=='day';$('reportStartLabel').hidden=$('reportEndLabel').hidden=mode!=='range';$('reportApply').disabled=mode==='latest';}
+function updateDateStatus(){
+ if(!dateSelection){$('reportDateStatus').textContent='แสดงข้อมูลตามเดือนรายงาน • เลือกวันหรือช่วงวันที่เพื่อดูรายงานย้อนหลังที่บันทึกไว้';return;}
+ const labels=[['performance','Retention'],['downsellDetails','Downsell TMH'],['tolDownsellDetails','Downsell TOL'],['solutions','Solution']];
+ $('reportDateStatus').textContent=`ช่วงที่เลือก ${fmtDate(dateSelection.start)} – ${fmtDate(dateSelection.end)} • `+labels.map(([k,label])=>{const date=(store[k]||[]).map(r=>r['Report Date']).sort().at(-1);return label+': '+(date?fmtDate(date):'ไม่มีรายงานในช่วงนี้');}).join(' | ');
+ $('monthNote').textContent='เลือกช่วงวันที่จากรายงานย้อนหลังและข้อมูลล่าสุด • วันที่ที่ไม่มีการบันทึกรายงานจะไม่มีข้อมูล';
+}
+function updateDateAvailability(){
+ const parts={overview:['performance'],branch:['branches'],executive:['branches'],downsell:['downsellDetails'],downsellTol:['tolDownsellDetails'],solution:['solutions'],churnCap:['branches']};
+ for(const [part,keys] of Object.entries(parts)){
+  const el=$(part+'Partition');let notice=el.querySelector('.date-empty');
+  if(!notice){notice=document.createElement('p');notice.className='date-empty';notice.setAttribute('role','status');el.prepend(notice);}
+  const empty=!!dateSelection&&keys.every(k=>!(store[k]||[]).length);
+  el.classList.toggle('date-unavailable',empty);notice.hidden=!empty;notice.textContent='ไม่มีรายงานที่บันทึกไว้ในช่วงวันที่เลือก กรุณาเลือกวันหรือช่วงเวลาอื่น';
+ }
+}
+$('reportDateMode').addEventListener('change',async()=>{
+ syncDateControls();
+ if($('reportDateMode').value==='latest'){dateSelection=null;await selectReportMonth(selectedReportMonth);return;}
+ $('reportApply').disabled=true;$('reportDateStatus').textContent='กำลังโหลดวันที่ที่มีรายงาน...';
+ try{await loadDateHistory();$('reportDateStatus').textContent='เลือกวันที่แล้วกดแสดงข้อมูล • มีรายงาน '+ReportDates.dates(dateHistoryStore()).map(fmtDate).join(', ');}
+ catch(error){$('reportDateStatus').textContent=error.message;}
+ finally{syncDateControls();}
+});
+$('reportApply').addEventListener('click',async()=>{
+ const mode=$('reportDateMode').value;if(mode==='latest')return;
+ $('reportApply').disabled=true;
+ try{
+  await loadDateHistory();
+  const start=mode==='day'?$('reportDay').value:$('reportStart').value,end=mode==='day'?start:$('reportEnd').value;
+  const next=ReportDates.filter(dateHistoryStore(),start,end);
+  dateSelection={start,end};store=next;$('solutionBranchFilter').value='ALL';updateDateStatus();populateRegions();render();
+ }catch(error){$('reportDateStatus').textContent=error.message;}
+ finally{syncDateControls();}
+});
+$('reportReset').addEventListener('click',()=>{resetDateSelection();selectReportMonth('live');});
+
 ["capType","capStatus"].forEach(id=>$(id).addEventListener("change",renderChurnCap));
 $("capSearch").addEventListener("input",renderChurnCap);
 $("capReset").addEventListener("click",()=>{$("capType").value="ALL";$("capStatus").value="ALL";$("capSearch").value="";renderChurnCap();});
-$("monthTabs").addEventListener("click",event=>{const button=event.target.closest("[data-month]");if(button)selectReportMonth(button.dataset.month);});
+$("monthTabs").addEventListener("click",event=>{const button=event.target.closest("[data-month]");if(button){resetDateSelection();selectReportMonth(button.dataset.month);}});
 $("executiveCopy").addEventListener("click",copyExecutiveNote);
 $("executiveShortcut").addEventListener("click",()=>{setPartition("executive");$("executivePartition").scrollIntoView({behavior:"smooth",block:"start"});});
 $("serviceFilter").addEventListener("change",render);
@@ -971,4 +1027,5 @@ $("sheetLink").href=SHEET_URL;
 loadData();
 window.setInterval(()=>{if(document.visibilityState==="visible")loadData();},5*60*1000);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")loadData();});
+
 
